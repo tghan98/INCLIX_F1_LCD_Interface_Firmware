@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project>
     <fileVersion>3</fileVersion>
     <configuration>
@@ -342,12 +342,14 @@
                     <name>CCIncludePath2</name>
                     <state>$PROJ_DIR$/../Core/Inc</state>
                     <state>$PROJ_DIR$/../USER/App/PowerControl_App</state>
+                    <state>$PROJ_DIR$/../USER/App/ImageSlide_App</state>
                     <state>$PROJ_DIR$/../Drivers/STM32G0xx_HAL_Driver/Inc</state>
                     <state>$PROJ_DIR$/../Drivers/STM32G0xx_HAL_Driver/Inc/Legacy</state>
                     <state>$PROJ_DIR$/../Drivers/CMSIS/Device/ST/STM32G0xx/Include</state>
                     <state>$PROJ_DIR$/../Drivers/CMSIS/Include</state>
                     <state>$PROJ_DIR$/../USER</state>
                     <state>$PROJ_DIR$/../USER/Drive/PowerControl_Drv</state>
+                    <state>$PROJ_DIR$/../USER/Drive/OLED_SSD1322_Drv</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -1083,6 +1085,12 @@
                 <file>
                     <name>$PROJ_DIR$\..\USER\App\PowerControl_App\PowerControl_App.c</name>
                 </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_App.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_Assets.c</name>
+                </file>
             </group>
             <group>
                 <name>Core</name>
@@ -1100,6 +1108,9 @@
                 <name>Drive</name>
                 <file>
                     <name>$PROJ_DIR$\..\USER\Drive\PowerControl_Drv\PowerControl_Drv.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\OLED_SSD1322_Drv\OLED_SSD1322_Drv.c</name>
                 </file>
             </group>
             <group>
@@ -1168,3 +1179,5 @@
         </group>
     </group>
 </project>
+
+

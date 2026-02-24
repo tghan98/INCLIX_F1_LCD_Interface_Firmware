@@ -52,12 +52,10 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI2_Init(void);
 /* USER CODE BEGIN PFP */
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
 /* USER CODE END 0 */
 
 /**
@@ -92,7 +90,6 @@ int main(void)
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
   User_Main_Init();
-
 
   /* USER CODE END 2 */
 
@@ -166,7 +163,7 @@ static void MX_SPI2_Init(void)
   /* SPI2 parameter configuration*/
   hspi2.Instance = SPI2;
   hspi2.Init.Mode = SPI_MODE_MASTER;
-  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.Direction = SPI_DIRECTION_1LINE;
   hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
@@ -293,4 +290,7 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
+
+
 
