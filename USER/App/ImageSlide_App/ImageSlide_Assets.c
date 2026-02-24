@@ -1,4 +1,4 @@
-#include "App/ImageSlide_App/ImageSlide_Assets.h"
+#include "ImageSlide_Assets.h"
 
 const uint8_t g_image_slide_frames[3][OLED_SSD1322_FRAME_BYTES] = {
   {

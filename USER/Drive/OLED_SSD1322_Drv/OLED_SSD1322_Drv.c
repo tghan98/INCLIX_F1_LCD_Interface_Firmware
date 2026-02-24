@@ -1,4 +1,4 @@
-#include "Drive/OLED_SSD1322_Drv/OLED_SSD1322_Drv.h"
+#include "OLED_SSD1322_Drv.h"
 
 #define OLED_POWER_ON_LEVEL      GPIO_PIN_RESET
 #define OLED_COL_START           0x1CU
@@ -10,7 +10,18 @@ extern SPI_HandleTypeDef hspi2;
 
 static void oled_select(uint8_t selected)
 {
-  HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, selected ? GPIO_PIN_RESET : GPIO_PIN_SET);
+  GPIO_PinState cs_state;
+
+  if (selected != 0U)
+  {
+    cs_state = GPIO_PIN_RESET;
+  }
+  else
+  {
+    cs_state = GPIO_PIN_SET;
+  }
+
+  HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, cs_state);
 }
 
 static void oled_write_cmd(uint8_t cmd)

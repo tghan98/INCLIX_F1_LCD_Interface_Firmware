@@ -1,7 +1,7 @@
-#include "App/ImageSlide_App/ImageSlide_App.h"
+#include "ImageSlide_App.h"
 
-#include "App/ImageSlide_App/ImageSlide_Assets.h"
-#include "Drive/OLED_SSD1322_Drv/OLED_SSD1322_Drv.h"
+#include "ImageSlide_Assets.h"
+#include "OLED_SSD1322_Drv.h"
 
 #define IMAGE_SLIDE_INTERVAL_MS    1500U
 

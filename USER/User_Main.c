@@ -1,6 +1,6 @@
 #include "User_Main.h"
 
-#include "App/ImageSlide_App/ImageSlide_App.h"
+#include "ImageSlide_App.h"
 
 int32_t User_Main_Init(void)
 {
