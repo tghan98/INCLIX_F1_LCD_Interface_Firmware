@@ -1,0 +1,18 @@
+# IAR workspace/user settings
+*.eww
+*.ewd
+*.dep
+*.dnx
+
+# IAR build outputs
+EWARM/**/Obj/
+EWARM/**/Exe/
+EWARM/**/List/
+EWARM/**/BrowseInfo/
+
+# Temporary and backups
+*.bak
+*.tmp
+
+# VS Code local settings
+.vscode/
