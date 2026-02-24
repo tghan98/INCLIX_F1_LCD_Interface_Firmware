@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project>
     <fileVersion>3</fileVersion>
     <configuration>
@@ -1083,6 +1083,12 @@
                 <file>
                     <name>$PROJ_DIR$\..\USER\App\PowerControl_App\PowerControl_App.c</name>
                 </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_App.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_Assets.c</name>
+                </file>
             </group>
             <group>
                 <name>Core</name>
@@ -1100,6 +1106,9 @@
                 <name>Drive</name>
                 <file>
                     <name>$PROJ_DIR$\..\USER\Drive\PowerControl_Drv\PowerControl_Drv.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\OLED_SSD1322_Drv\OLED_SSD1322_Drv.c</name>
                 </file>
             </group>
             <group>
@@ -1168,3 +1177,5 @@
         </group>
     </group>
 </project>
+
+
