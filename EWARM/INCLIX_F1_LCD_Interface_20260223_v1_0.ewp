@@ -337,12 +337,12 @@
                 <option>
                     <name>PreInclude</name>
                     <state></state>
-                </option>
-                <option>
+                </option>                <option>
                     <name>CCIncludePath2</name>
                     <state>$PROJ_DIR$/../Core/Inc</state>
                     <state>$PROJ_DIR$/../USER/App/PowerControl_App</state>
                     <state>$PROJ_DIR$/../USER/App/ImageSlide_App</state>
+                    <state>$PROJ_DIR$/../USER/App/Button_App</state>
                     <state>$PROJ_DIR$/../Drivers/STM32G0xx_HAL_Driver/Inc</state>
                     <state>$PROJ_DIR$/../Drivers/STM32G0xx_HAL_Driver/Inc/Legacy</state>
                     <state>$PROJ_DIR$/../Drivers/CMSIS/Device/ST/STM32G0xx/Include</state>
@@ -350,6 +350,7 @@
                     <state>$PROJ_DIR$/../USER</state>
                     <state>$PROJ_DIR$/../USER/Drive/PowerControl_Drv</state>
                     <state>$PROJ_DIR$/../USER/Drive/OLED_SSD1322_Drv</state>
+                    <state>$PROJ_DIR$/../USER/Drive/Button_Drv</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -1078,12 +1079,18 @@
                 <name>$PROJ_DIR$\startup_stm32g081xx.s</name>
             </file>
         </group>
-        <group>
+            <group>
             <name>User</name>
             <group>
                 <name>App</name>
                 <file>
                     <name>$PROJ_DIR$\..\USER\App\PowerControl_App\PowerControl_App.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\Button_App\Button_App.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\Button_App\Button_Interface.c</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_App.c</name>
@@ -1112,6 +1119,9 @@
                 <file>
                     <name>$PROJ_DIR$\..\USER\Drive\OLED_SSD1322_Drv\OLED_SSD1322_Drv.c</name>
                 </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\Button_Drv\Button_Drv.c</name>
+                </file>
             </group>
             <group>
                 <name>UserMain</name>
@@ -1121,7 +1131,7 @@
             </group>
         </group>
     </group>
-    <group>
+            <group>
         <name>Drivers</name>
         <group>
             <name>CMSIS</name>
@@ -1129,7 +1139,7 @@
                 <name>$PROJ_DIR$\..\Core\Src\system_stm32g0xx.c</name>
             </file>
         </group>
-        <group>
+            <group>
             <name>STM32G0xx_HAL_Driver</name>
             <file>
                 <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal.c</name>
@@ -1179,5 +1189,17 @@
         </group>
     </group>
 </project>
+
+
+
+
+
+
+
+
+
+
+
+
 
 
