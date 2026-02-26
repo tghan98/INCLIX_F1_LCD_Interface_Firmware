@@ -343,6 +343,7 @@
                     <state>$PROJ_DIR$/../USER/App/PowerControl_App</state>
                     <state>$PROJ_DIR$/../USER/App/ImageSlide_App</state>
                     <state>$PROJ_DIR$/../USER/App/Button_App</state>
+                    <state>$PROJ_DIR$/../USER/App/BatteryMonitor_App</state>
                     <state>$PROJ_DIR$/../Drivers/STM32G0xx_HAL_Driver/Inc</state>
                     <state>$PROJ_DIR$/../Drivers/STM32G0xx_HAL_Driver/Inc/Legacy</state>
                     <state>$PROJ_DIR$/../Drivers/CMSIS/Device/ST/STM32G0xx/Include</state>
@@ -351,6 +352,7 @@
                     <state>$PROJ_DIR$/../USER/Drive/PowerControl_Drv</state>
                     <state>$PROJ_DIR$/../USER/Drive/OLED_SSD1322_Drv</state>
                     <state>$PROJ_DIR$/../USER/Drive/Button_Drv</state>
+                    <state>$PROJ_DIR$/../USER/Drive/DAC_Manager</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -1113,6 +1115,12 @@
                 <file>
                     <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_Assets.c</name>
                 </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\BatteryMonitor_App\BatteryMonitor_App.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\BatteryMonitor_App\BatteryMonitor_Interface.c</name>
+                </file>
             </group>
             <group>
                 <name>Drive</name>
@@ -1124,6 +1132,9 @@
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\USER\Drive\Button_Drv\Button_Drv.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\DAC_Manager\DAC_Manager.c</name>
                 </file>
             </group>
             <group>
@@ -1185,6 +1196,15 @@
             </file>
             <file>
                 <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_spi_ex.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_comp.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dac.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dac_ex.c</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_ll_rcc.c</name>
