@@ -17,6 +17,7 @@
 #define BAT_BLOCK_L2_Y             20U
 #define BAT_BLOCK_L1_Y             24U
 
+
 static uint32_t s_last_tick;
 static uint32_t s_frame_index;
 static uint8_t s_is_paused;
@@ -64,7 +65,7 @@ static void ImageSlide_DrawBatteryIcon(uint8_t *frame, uint32_t battery_level)
   /* Black out blocks by level: L3=full, L2=2칸, L1=1칸, L0=0칸 */
   if (battery_level == 2U)
   {
-    ImageSlide_DrawBatteryBlock(frame, BAT_BLOCK_X_START, BAT_BLOCK_L2_Y, 0x00U);
+    ImageSlide_DrawBatteryBlock(frame, BAT_BLOCK_X_START, BAT_BLOCK_L3_Y, 0x00U);
   }
   else if (battery_level == 1U)
   {
@@ -91,10 +92,10 @@ void ImageSlide_App_Init(void)
   {
     /* Copy frame to buffer, draw battery icon, and display */
     memcpy(s_frame_buffer, g_image_slide_frames[s_frame_index], OLED_SSD1322_FRAME_BYTES);
-    if (s_frame_index == 2U)
-    {
-      ImageSlide_DrawBatteryIcon(s_frame_buffer, BatteryMonitor_Interface_GetLevel());
-    }
+            if (s_frame_index == 2U)
+            {
+          ImageSlide_DrawBatteryIcon(s_frame_buffer, BatteryMonitor_Interface_GetLevel());
+            }
     OLED_SSD1322_Drv_WriteFrame(s_frame_buffer);
   }
 }
@@ -114,12 +115,12 @@ void ImageSlide_App_Run(void)
   while (BatteryMonitor_Interface_GetEvent(&bat_event) == 0)
   {
     /* If on asset 2 (battery icon frame), update and display */
-    if (s_frame_index == 2U)
-    {
+        if (s_frame_index == 2U)
+        {
       memcpy(s_frame_buffer, g_image_slide_frames[s_frame_index], OLED_SSD1322_FRAME_BYTES);
       ImageSlide_DrawBatteryIcon(s_frame_buffer, bat_event.level);
       OLED_SSD1322_Drv_WriteFrame(s_frame_buffer);
-    }
+        }
   }
 
   /* Handle all queued button events */
