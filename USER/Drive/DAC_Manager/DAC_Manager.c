@@ -1,4 +1,5 @@
 // DAC 매니저 (배터리 전압 비교용 DAC + COMP 제어)
+// 구조: IDDD_ADC_Manager 모방 (비블로킹 + 상태머신)
 
 #include "DAC_Manager.h"
 
@@ -6,87 +7,172 @@
 extern DAC_HandleTypeDef hdac1;   // DAC1 핸들
 extern COMP_HandleTypeDef hcomp2;  // COMP2 핸들
 
-// 초기화 플래그 (중복 초기화 방지)
+//------------------------------------------------------------------------------
+// 내부 상태 변수
+static DAC_Manager_State_t s_state = DAC_STATE_IDLE;
+static uint32_t s_dac_settle_start_tick = 0U;  // DAC 설정 시작 시간 (HAL_GetTick)
 static uint8_t s_dac_manager_initialized = 0U;
 
-/* DAC 매니저 초기화 (DAC1 + COMP2 시작) */
-int32_t DAC_Manager_Init(void)
+// DAC 안정화 대기 시간 (ms)
+#define DAC_SETTLE_TIME_MSEC (5U)
+
+//------------------------------------------------------------------------------
+/**
+  * @brief   DAC 매니저 초기화 (DAC1 + COMP2 시작)
+  * @param   None
+  * @retval  DAC_MAN_SUCCESS 또는 DAC_MAN_SYSTEM_ERR
+  */
+void DAC_Manager_Init(void)
 {
   // 이미 초기화되었으면 중복 실행 방지
   if (s_dac_manager_initialized != 0U)
   {
-    return DAC_MAN_SUCCESS;
+    return;
   }
 
-  // DAC1 채널1 시작 (PA4에서 아날로그 출력 가능)
-  if (HAL_DAC_Start(&hdac1, DAC_CHANNEL_1) != HAL_OK)
-  {
-    return DAC_MAN_SYSTEM_ERR;
-  }
+  // DAC1 채널1 시작 (PA4에서 아날로그 출력)
+  HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
 
-  // COMP2 시작 (PA3 vs PA4 비교 시작)
-  if (HAL_COMP_Start(&hcomp2) != HAL_OK)
-  {
-    return DAC_MAN_SYSTEM_ERR;
-  }
+  // COMP2 시작 (PA3 vs PA4 비교)
+  HAL_COMP_Start(&hcomp2);
 
-  // 초기화 완료 플래그 설정
+  // 초기화 완료
   s_dac_manager_initialized = 1U;
-  return DAC_MAN_SUCCESS;
+  s_state = DAC_STATE_IDLE;
 }
 
-/* DAC 기준 전압 설정 (COMP2 비교 기준값 변경) */
-int32_t DAC_Manager_Set_RefValue(uint16_t dac_value)
+//------------------------------------------------------------------------------
+/**
+  * @brief   DAC 기준 전압 설정 시작 (비블로킹, 상태머신 기반)
+  *          IDDD_ADC_Manager_Start_Polling() 패턴 모방
+  * @param   dac_value: 12-bit DAC 값 (0~4095)
+  * @retval  DAC_MAN_SUCCESS: 시작 성공
+  *          DAC_MAN_SYSTEM_ERR: 초기화 안 됨
+  *          DAC_MAN_INVALID_PARAM: 범위 초과
+  *          DAC_MAN_BUSY: 이전 요청 진행 중
+  */
+int32_t DAC_Manager_Start_Set_RefValue(uint16_t dac_value)
 {
   // 초기화 확인
   if (s_dac_manager_initialized == 0U)
   {
-    return DAC_MAN_SYSTEM_ERR;  // 초기화 안 됨
+    return DAC_MAN_SYSTEM_ERR;
   }
 
-  // 범위 검사 (12-bit DAC는 0~4095만 가능)
-  if (dac_value > 0x0FFFU)  // 0x0FFF = 4095
+  // 범위 검사 (12-bit DAC: 0~4095)
+  if (dac_value > 0x0FFFU)
   {
-    return DAC_MAN_INVALID_PARAM;  // 범위 초과
+    return DAC_MAN_INVALID_PARAM;
   }
 
-  // DAC 출력값 설정 → PA4에 아날로그 전압 출력
-  // 출력 전압 = (dac_value / 4095) × 3.3V
+  // 상태 확인: IDLE이 아니면 BUSY
+  if (s_state != DAC_STATE_IDLE)
+  {
+    return DAC_MAN_BUSY;
+  }
+
+  // DAC 출력값 설정
   if (HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, dac_value) != HAL_OK)
-  {
-    return DAC_MAN_SYSTEM_ERR;  // 하드웨어 에러
-  }
-
-  return DAC_MAN_SUCCESS;
-}
-
-/* COMP2 비교 결과 읽기 (배터리 전압 vs DAC 기준 전압) */
-int32_t DAC_Manager_Get_CompareResult(uint8_t *p_is_battery_higher_than_dac)
-{
-  uint32_t comp_level;
-
-  // 안전성 검사 (초기화 + 포인터 유효성)
-  if (s_dac_manager_initialized == 0U || p_is_battery_higher_than_dac == NULL)
   {
     return DAC_MAN_SYSTEM_ERR;
   }
 
-  // COMP2 출력 레벨 읽기 (하드웨어 비교 결과)
-  comp_level = HAL_COMP_GetOutputLevel(&hcomp2);
-
-  /*
-   * COMP2 비교 로직:
-   * - InputPlus (PA3, 배터리) > InputMinus (PA4, DAC) → HIGH
-   * - InputPlus (PA3, 배터리) < InputMinus (PA4, DAC) → LOW
-   */
-  if (comp_level == COMP_OUTPUT_LEVEL_HIGH)
-  {
-    *p_is_battery_higher_than_dac = 1U;  // 배터리가 DAC보다 높음
-  }
-  else if (comp_level == COMP_OUTPUT_LEVEL_LOW)
-  {
-    *p_is_battery_higher_than_dac = 0U;  // 배터리가 DAC보다 낮음
-  }
+  // 상태 변경 + 타이밍 기록
+  s_dac_settle_start_tick = HAL_GetTick();
+  s_state = DAC_STATE_SETTING;
 
   return DAC_MAN_SUCCESS;
+}
+
+//------------------------------------------------------------------------------
+/**
+  * @brief   DAC 값 안정화 대기 확인 (5ms 경과 확인)
+  *          IDDD_ADC_Manager_Get_Polling_Result() 패턴 모방
+  * @param   None
+  * @retval  DAC_MAN_SUCCESS: 안정화 완료 (상태→COMPLETE)
+  *          DAC_MAN_NOT_READY: 아직 대기 중
+  *          DAC_MAN_SYSTEM_ERR: 상태 오류
+  */
+int32_t DAC_Manager_Check_Ready(void)
+{
+  uint32_t current_tick;
+  uint32_t elapsed_ms;
+
+  // 초기화 확인
+  if (s_dac_manager_initialized == 0U)
+  {
+    return DAC_MAN_SYSTEM_ERR;
+  }
+
+  // 상태 확인: SETTING 상태여야 함
+  if (s_state != DAC_STATE_SETTING)
+  {
+    return DAC_MAN_SYSTEM_ERR;
+  }
+
+  // 경과 시간 계산
+  current_tick = HAL_GetTick();
+  elapsed_ms = current_tick - s_dac_settle_start_tick;
+
+  // 5ms 미만이면 아직 준비 안 됨
+  if (elapsed_ms < DAC_SETTLE_TIME_MSEC)
+  {
+    return DAC_MAN_NOT_READY;
+  }
+
+  // 5ms 이상 경과: 안정화 완료
+  s_state = DAC_STATE_COMPLETE;
+  return DAC_MAN_SUCCESS;
+}
+
+//------------------------------------------------------------------------------
+/**
+  * @brief   COMP2 비교 결과 읽기 및 상태 복귀
+  *          상태: COMPLETE → IDLE
+  * @param   p_is_higher: 배터리 > DAC 여부 (1=높음, 0=낮음)
+  * @retval  DAC_MAN_SUCCESS 또는 DAC_MAN_SYSTEM_ERR
+  */
+int32_t DAC_Manager_Get_CompareResult(uint8_t *p_is_higher)
+{
+  uint32_t comp_level;
+
+  // 안전성 검사
+  if (s_dac_manager_initialized == 0U || p_is_higher == NULL)
+  {
+    return DAC_MAN_SYSTEM_ERR;
+  }
+
+  // 상태 확인: COMPLETE 상태여야 함
+  if (s_state != DAC_STATE_COMPLETE)
+  {
+    return DAC_MAN_SYSTEM_ERR;
+  }
+
+  // COMP2 출력 레벨 읽기
+  comp_level = HAL_COMP_GetOutputLevel(&hcomp2);
+
+  if (comp_level == COMP_OUTPUT_LEVEL_HIGH)
+  {
+    *p_is_higher = 1U;  // 배터리가 DAC보다 높음
+  }
+  else
+  {
+    *p_is_higher = 0U;  // 배터리가 DAC보다 낮음 (또는 같음)
+  }
+
+  // 상태 복귀: COMPLETE → IDLE
+  s_state = DAC_STATE_IDLE;
+
+  return DAC_MAN_SUCCESS;
+}
+
+//------------------------------------------------------------------------------
+/**
+  * @brief   현재 DAC 매니저 상태 조회
+  * @param   None
+  * @retval  DAC_Manager_State_t (IDLE / SETTING / COMPLETE)
+  */
+DAC_Manager_State_t DAC_Manager_Get_State(void)
+{
+  return s_state;
 }

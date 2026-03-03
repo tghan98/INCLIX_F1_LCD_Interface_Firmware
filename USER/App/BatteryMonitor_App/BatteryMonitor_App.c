@@ -12,6 +12,23 @@ static uint32_t s_queue_count = 0U;   // 큐에 저장된 이벤트 개수
 // 현재 배터리 레벨 (0~3)
 static uint32_t s_current_level = BATTERY_LEVEL_HIGH;
 
+typedef enum
+{
+  BAT_SCAN_STATE_INIT = 0,
+  BAT_SCAN_STATE_START,          // DAC 값 설정 시작
+  BAT_SCAN_STATE_WAIT_READY,     // DAC 안정화 대기 (5ms)
+  BAT_SCAN_STATE_END             // 비교 결과 읽기
+} BatteryScanState_t;
+
+static BatteryScanState_t s_scan_state = BAT_SCAN_STATE_INIT;
+static uint32_t s_scan_stage = 0U;
+static uint8_t s_scan_result[3] = {0U, 0U, 0U};
+static uint32_t s_last_cycle_tick = 0U;
+static uint32_t s_stage_start_tick = 0U;
+
+#define BAT_SCAN_CYCLE_MSEC   (100U)
+#define BAT_DAC_SETTLE_MSEC   (5U)
+
 static void BatteryMonitor_App_Que_Init(void);
 static int32_t BatteryMonitor_App_Que_Push(uint32_t level);
 
@@ -49,60 +66,154 @@ void BatteryMonitor_App_Init(void)
 
   // 초기값: 배터리 완충 상태로 가정
   s_current_level = BATTERY_LEVEL_HIGH;
+
+  s_scan_state = BAT_SCAN_STATE_INIT;
+  s_scan_stage = 0U;
+  s_scan_result[0] = 0U;
+  s_scan_result[1] = 0U;
+  s_scan_result[2] = 0U;
+  s_last_cycle_tick = HAL_GetTick();
+  s_stage_start_tick = s_last_cycle_tick;
 }
 
 /* 배터리 레벨 감지 및 이벤트 생성 (메인 루프에서 호출) */
 void BatteryMonitor_App_Task(void)
 {
-  uint8_t result[3];  // 3개 임계값 비교 결과 저장
+  uint32_t current_tick = HAL_GetTick();
+  uint32_t elapsed_ms;
+  uint32_t threshold;
+  uint8_t compare_result = 0U;
   uint32_t new_level;
+  int32_t dac_result;
 
-  // 1차 비교: DAC를 2048(1.65V)로 설정 후 배터리 전압과 비교
-  DAC_Manager_Set_RefValue(BAT_THRESHOLD_CRITICAL);
-  HAL_Delay(5);  // DAC 안정화 대기
-  DAC_Manager_Get_CompareResult(&result[0]);  // BAT > 1.65V이면 1, 아니면 0
+  switch (s_scan_state)
+  {
+    case BAT_SCAN_STATE_INIT:
+      s_scan_stage = 0U;
+      s_scan_result[0] = 0U;
+      s_scan_result[1] = 0U;
+      s_scan_result[2] = 0U;
+      s_last_cycle_tick = current_tick;
+      s_stage_start_tick = current_tick;
+      s_scan_state = BAT_SCAN_STATE_START;
+      break;
 
-  // 2차 비교: DAC를 2172(1.75V)로 설정 후 배터리 전압과 비교
-  DAC_Manager_Set_RefValue(BAT_THRESHOLD_LOW);
-  HAL_Delay(5);
-  DAC_Manager_Get_CompareResult(&result[1]);  // BAT > 1.75V이면 1, 아니면 0
+    case BAT_SCAN_STATE_START:
+      // 100ms 사이클 타이밍 체크
+      if (s_scan_stage == 0U)
+      {
+        elapsed_ms = current_tick - s_last_cycle_tick;
+        if (elapsed_ms < BAT_SCAN_CYCLE_MSEC)
+        {
+          break;  // 아직 시간 도래 전
+        }
+      }
 
-  // 3차 비교: DAC를 2296(1.85V)로 설정 후 배터리 전압과 비교
-  DAC_Manager_Set_RefValue(BAT_THRESHOLD_MEDIUM);
-  HAL_Delay(5);
-  DAC_Manager_Get_CompareResult(&result[2]);  // BAT > 1.85V이면 1, 아니면 0
+      // 단계별 DAC 임계값 결정
+      if (s_scan_stage == 0U)
+      {
+        threshold = BAT_THRESHOLD_CRITICAL;
+      }
+      else if (s_scan_stage == 1U)
+      {
+        threshold = BAT_THRESHOLD_LOW;
+      }
+      else
+      {
+        threshold = BAT_THRESHOLD_MEDIUM;
+      }
 
-  /*
-   * 레벨 판정 로직: 3번 비교 결과로 배터리 상태 결정
-   * result[i] = 1: BAT > threshold[i]
-   * result[i] = 0: BAT <= threshold[i]
-   */
-  if (result[0] == 0)
-  {
-    // BAT <= 1.65V (배터리 ≤ 3.3V)
-    new_level = BATTERY_LEVEL_CRITICAL;  // 0칸: 긴급 충전 필요
-  }
-  else if (result[1] == 0)
-  {
-    // 1.65V < BAT <= 1.75V (배터리 3.3V~3.5V)
-    new_level = BATTERY_LEVEL_LOW;  // 1칸: 배터리 부족
-  }
-  else if (result[2] == 0)
-  {
-    // 1.75V < BAT <= 1.85V (배터리 3.5V~3.7V)
-    new_level = BATTERY_LEVEL_MEDIUM;  // 2칸: 배터리 보통
-  }
-  else
-  {
-    // BAT > 1.85V (배터리 > 3.7V)
-    new_level = BATTERY_LEVEL_HIGH;  // 3칸: 배터리 충분
-  }
+      // DAC 값 설정 시작 (비블로킹)
+      dac_result = DAC_Manager_Start_Set_RefValue(threshold);
+      if (dac_result == DAC_MAN_SUCCESS)
+      {
+        // 성공: 안정화 대기 상태로 진행
+        s_stage_start_tick = current_tick;
+        s_scan_state = BAT_SCAN_STATE_WAIT_READY;
+      }
+      else if (dac_result == DAC_MAN_BUSY)
+      {
+        // 이전 요청이 진행 중: 대기
+      }
+      else
+      {
+        // 에러 처리
+      }
+      break;
 
-  // 레벨이 변경되었을 때만 이벤트 큐에 추가
-  if (new_level != s_current_level)
-  {
-    s_current_level = new_level;
-    BatteryMonitor_App_Que_Push(new_level);  // UI 갱신을 위해 이벤트 발행
+    case BAT_SCAN_STATE_WAIT_READY:
+      // DAC 안정화 대기 (5ms 경과 확인)
+      dac_result = DAC_Manager_Check_Ready();
+      if (dac_result == DAC_MAN_SUCCESS)
+      {
+        // 안정화 완료: 비교 결과 읽기로 진행
+        s_scan_state = BAT_SCAN_STATE_END;
+      }
+      else if (dac_result == DAC_MAN_NOT_READY)
+      {
+        // 아직 5ms 경과 전: 대기
+        break;
+      }
+      else
+      {
+        // 에러: INIT으로 복귀
+        s_scan_state = BAT_SCAN_STATE_INIT;
+      }
+      break;
+
+    case BAT_SCAN_STATE_END:
+      // COMP 비교 결과 읽기 + 상태 복귀
+      dac_result = DAC_Manager_Get_CompareResult(&compare_result);
+      if (dac_result != DAC_MAN_SUCCESS)
+      {
+        // 에러: INIT으로 복귀
+        s_scan_state = BAT_SCAN_STATE_INIT;
+        break;
+      }
+
+      s_scan_result[s_scan_stage] = compare_result;
+
+      // 다음 단계로 진행 또는 결과 판정
+      if (s_scan_stage < 2U)
+      {
+        s_scan_stage++;
+        s_scan_state = BAT_SCAN_STATE_START;
+        break;
+      }
+
+      // 3단계 모두 완료: 배터리 레벨 판정
+      if (s_scan_result[0] == 0U)
+      {
+        new_level = BATTERY_LEVEL_CRITICAL;
+      }
+      else if (s_scan_result[1] == 0U)
+      {
+        new_level = BATTERY_LEVEL_LOW;
+      }
+      else if (s_scan_result[2] == 0U)
+      {
+        new_level = BATTERY_LEVEL_MEDIUM;
+      }
+      else
+      {
+        new_level = BATTERY_LEVEL_HIGH;
+      }
+
+      if (new_level != s_current_level)
+      {
+        s_current_level = new_level;
+        BatteryMonitor_App_Que_Push(new_level);
+      }
+
+      // 다음 사이클을 위해 초기화
+      s_scan_stage = 0U;
+      s_last_cycle_tick = current_tick;
+      s_scan_state = BAT_SCAN_STATE_START;
+      break;
+
+    default:
+      s_scan_state = BAT_SCAN_STATE_INIT;
+      break;
   }
 }
 
