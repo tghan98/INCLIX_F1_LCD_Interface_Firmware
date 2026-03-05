@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <project>
     <fileVersion>3</fileVersion>
     <configuration>
@@ -337,22 +337,25 @@
                 <option>
                     <name>PreInclude</name>
                     <state></state>
-                </option>                <option>
+                </option>
+                <option>
                     <name>CCIncludePath2</name>
                     <state>$PROJ_DIR$/../Core/Inc</state>
-                    <state>$PROJ_DIR$/../USER/App/PowerControl_App</state>
-                    <state>$PROJ_DIR$/../USER/App/ImageSlide_App</state>
-                    <state>$PROJ_DIR$/../USER/App/Button_App</state>
-                    <state>$PROJ_DIR$/../USER/App/BatteryMonitor_App</state>
                     <state>$PROJ_DIR$/../Drivers/STM32G0xx_HAL_Driver/Inc</state>
                     <state>$PROJ_DIR$/../Drivers/STM32G0xx_HAL_Driver/Inc/Legacy</state>
                     <state>$PROJ_DIR$/../Drivers/CMSIS/Device/ST/STM32G0xx/Include</state>
                     <state>$PROJ_DIR$/../Drivers/CMSIS/Include</state>
                     <state>$PROJ_DIR$/../USER</state>
-                    <state>$PROJ_DIR$/../USER/Drive/PowerControl_Drv</state>
-                    <state>$PROJ_DIR$/../USER/Drive/OLED_SSD1322_Drv</state>
+                    <state>$PROJ_DIR$/../USER/App/BatteryMonitor_App</state>
+                    <state>$PROJ_DIR$/../USER/App/Button_App</state>
+                    <state>$PROJ_DIR$/../USER/App/EEPROM_Test_App</state>
+                    <state>$PROJ_DIR$/../USER/App/ImageSlide_App</state>
+                    <state>$PROJ_DIR$/../USER/App/PowerControl_App</state>
                     <state>$PROJ_DIR$/../USER/Drive/Button_Drv</state>
                     <state>$PROJ_DIR$/../USER/Drive/DAC_Manager</state>
+                    <state>$PROJ_DIR$/../USER/Drive/EEPROM_CAT24C256_Drv</state>
+                    <state>$PROJ_DIR$/../USER/Drive/OLED_SSD1322_Drv</state>
+                    <state>$PROJ_DIR$/../USER/Drive/PowerControl_Drv</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -1096,56 +1099,8 @@
                 </file>
             </group>
         </group>
-        <group>
-            <name>USER</name>
-            <group>
-                <name>App</name>
-                <file>
-                    <name>$PROJ_DIR$\..\USER\App\PowerControl_App\PowerControl_App.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\USER\App\Button_App\Button_App.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\USER\App\Button_App\Button_Interface.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_App.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_Assets.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\USER\App\BatteryMonitor_App\BatteryMonitor_App.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\USER\App\BatteryMonitor_App\BatteryMonitor_Interface.c</name>
-                </file>
-            </group>
-            <group>
-                <name>Drive</name>
-                <file>
-                    <name>$PROJ_DIR$\..\USER\Drive\PowerControl_Drv\PowerControl_Drv.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\USER\Drive\OLED_SSD1322_Drv\OLED_SSD1322_Drv.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\USER\Drive\Button_Drv\Button_Drv.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\USER\Drive\DAC_Manager\DAC_Manager.c</name>
-                </file>
-            </group>
-            <group>
-                <name>UserMain</name>
-                <file>
-                    <name>$PROJ_DIR$\..\USER\User_Main.c</name>
-                </file>
-            </group>
-        </group>
     </group>
-            <group>
+    <group>
         <name>Drivers</name>
         <group>
             <name>CMSIS</name>
@@ -1153,13 +1108,22 @@
                 <name>$PROJ_DIR$\..\Core\Src\system_stm32g0xx.c</name>
             </file>
         </group>
-            <group>
+        <group>
             <name>STM32G0xx_HAL_Driver</name>
             <file>
                 <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal.c</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_comp.c</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_cortex.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dac.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dac_ex.c</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dma.c</name>
@@ -1180,6 +1144,12 @@
                 <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_gpio.c</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_i2c.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_i2c_ex.c</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_pwr.c</name>
             </file>
             <file>
@@ -1198,31 +1168,137 @@
                 <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_spi_ex.c</name>
             </file>
             <file>
-                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_comp.c</name>
+                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_uart.c</name>
             </file>
             <file>
-                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dac.c</name>
-            </file>
-            <file>
-                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dac_ex.c</name>
+                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_uart_ex.c</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_ll_rcc.c</name>
             </file>
         </group>
     </group>
+    <group>
+        <name>USER</name>
+        <group>
+            <name>App</name>
+            <group>
+                <name>EEPROM_Test_App</name>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\EEPROM_Test_App\EEPROM_Test_App.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\EEPROM_Test_App\EEPROM_Test_App.h</name>
+                </file>
+            </group>
+            <group>
+                <name>BatteryMonitor_App</name>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\BatteryMonitor_App\BatteryMonitor_App.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\BatteryMonitor_App\BatteryMonitor_App.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\BatteryMonitor_App\BatteryMonitor_Interface.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\BatteryMonitor_App\BatteryMonitor_Interface.h</name>
+                </file>
+            </group>
+            <group>
+                <name>Button_App</name>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\Button_App\Button_App.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\Button_App\Button_App.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\Button_App\Button_Interface.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\Button_App\Button_Interface.h</name>
+                </file>
+            </group>
+            <group>
+                <name>ImageSlide_App</name>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_App.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_App.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_Assets.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_Assets.h</name>
+                </file>
+            </group>
+            <group>
+                <name>PowerControl_App</name>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\PowerControl_App\PowerControl_App.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\PowerControl_App\PowerControl_App.h</name>
+                </file>
+            </group>
+        </group>
+        <group>
+            <name>Drive</name>
+            <group>
+                <name>EEPROM_CAT24C256_Drv</name>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\EEPROM_CAT24C256_Drv\EEPROM_CAT24C256_Drv.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\EEPROM_CAT24C256_Drv\EEPROM_CAT24C256_Drv.h</name>
+                </file>
+            </group>
+            <group>
+                <name>Button_Drv</name>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\Button_Drv\Button_Drv.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\Button_Drv\Button_Drv.h</name>
+                </file>
+            </group>
+            <group>
+                <name>DAC_Manager</name>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\DAC_Manager\DAC_Manager.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\DAC_Manager\DAC_Manager.h</name>
+                </file>
+            </group>
+            <group>
+                <name>OLED_SSD1322_Drv</name>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\OLED_SSD1322_Drv\OLED_SSD1322_Drv.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\OLED_SSD1322_Drv\OLED_SSD1322_Drv.h</name>
+                </file>
+            </group>
+            <group>
+                <name>PowerControl_Drv</name>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\PowerControl_Drv\PowerControl_Drv.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\PowerControl_Drv\PowerControl_Drv.h</name>
+                </file>
+            </group>
+        </group>
+        <file>
+            <name>$PROJ_DIR$\..\USER\User_Main.c</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\USER\User_Main.h</name>
+        </file>
+    </group>
 </project>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
