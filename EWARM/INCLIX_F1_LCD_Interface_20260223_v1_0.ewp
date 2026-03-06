@@ -1121,6 +1121,9 @@
                 <file>
                     <name>$PROJ_DIR$\..\USER\App\BatteryMonitor_App\BatteryMonitor_Interface.c</name>
                 </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\App\Spinner_App.c</name>
+                </file>
             </group>
             <group>
                 <name>Drive</name>
@@ -1135,6 +1138,9 @@
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\USER\Drive\DAC_Manager\DAC_Manager.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\Spinner_Drv.c</name>
                 </file>
             </group>
             <group>
