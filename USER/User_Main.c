@@ -1,26 +1,17 @@
 #include "User_Main.h"
 
-#include "EEPROM_Test_App.h"
+#include "Card_Insert_Test_App.h"
 
 int32_t User_Main_Init(void)
 {
-  EEPROM_Test_App_Init();
+  Card_Insert_Test_App_Init();
   return 0;
 }
 
 int32_t User_Main_Run(void)
 {
-  static uint8_t s_test_done = 0U;
-
-  if (s_test_done == 0U)
-  {
-    s_test_done = 1U;
-    EEPROM_Test_App_RunOnce();
-  }
-
-  while (1)
-  {
-  }
-
+  /* 카드 삽입 테스트 무한 루프 */
+  Card_Insert_Test_App_Run();
+  
   return 0;
 }
