@@ -1,5 +1,6 @@
 #include "Spinner_App.h"
 #include "../Drive/Spinner_Drv.h"
+#include "../Drive/Sliding_Icon_Drv.h"
 #include "OLED_SSD1322_Drv.h"
 #include <string.h>
 
@@ -14,6 +15,7 @@ static uint32_t s_prev_send_time = 0U; // TODO: 테스트 후 삭제
 int32_t Spinner_App_Init(void)
 {
   OLED_SSD1322_Drv_Init();
+  Sliding_Icon_Drv_Init();  // Init에서 자동으로 시작됨
 
   memset(s_frame, 0, sizeof(s_frame));
   Spinner_Drv_DrawRotatingSprite(s_frame, s_angle_idx);
@@ -38,6 +40,9 @@ int32_t Spinner_App_Run(void)
   s_last_tick = now;
   s_angle_idx = (s_angle_idx + 1U) % SPINNER_FRAMES;
 
+  // 슬라이딩 아이콘 상태 업데이트
+  Sliding_Icon_Drv_Update();
+
   memset(s_frame, 0, sizeof(s_frame));
   
   // DEBUG: 타이밍 정보 표시 (우측 상단)
@@ -45,13 +50,17 @@ int32_t Spinner_App_Run(void)
   Spinner_Drv_DrawNumber(s_frame, 220, 14, s_prev_send_time);  /* Send: X ms */
   Spinner_Drv_DrawNumber(s_frame, 220, 23, SPINNER_FRAMES);    /* Frames: 60 */
   
-  // DEBUG: 라벨 표시 (좌측 하단)
-  Spinner_Drv_DrawText(s_frame, 5, 50, "Draw");
-  Spinner_Drv_DrawText(s_frame, 5, 57, "Send");
+  // DEBUG: 라벨 표시 (숫자 바로 왼쪽)
+  Spinner_Drv_DrawText(s_frame, 195, 5, "Draw");
+  Spinner_Drv_DrawText(s_frame, 195, 14, "Send");
   
   // TODO: 테스트 후 삭제 - 그리기 시간 측정
   draw_start = HAL_GetTick();
   Spinner_Drv_DrawRotatingSprite(s_frame, s_angle_idx);
+  
+  // 슬라이딩 아이콘 그리기 (모래시계 위에 그려짐)
+  Sliding_Icon_Drv_Draw(s_frame);
+  
   draw_end = HAL_GetTick();
   draw_time = draw_end - draw_start;
   

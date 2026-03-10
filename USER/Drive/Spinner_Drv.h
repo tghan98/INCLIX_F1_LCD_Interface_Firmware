@@ -6,7 +6,7 @@
 /* Spinner sprite configuration */
 #define SPINNER_SPRITE_W         (14)
 #define SPINNER_SPRITE_H         (17)
-#define SPINNER_DST_SIZE         (18)
+#define SPINNER_DST_SIZE         (24)    // 회전 시 잘림 방지 (대각선 ≈22px)
 #define SPINNER_CENTER_X         (128)
 #define SPINNER_CENTER_Y         (32)
 #define SPINNER_FIX_SCALE        (1024)

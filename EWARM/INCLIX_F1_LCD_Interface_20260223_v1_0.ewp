@@ -1142,6 +1142,9 @@
                 <file>
                     <name>$PROJ_DIR$\..\USER\Drive\Spinner_Drv.c</name>
                 </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\Sliding_Icon_Drv.c</name>
+                </file>
             </group>
             <group>
                 <name>UserMain</name>
