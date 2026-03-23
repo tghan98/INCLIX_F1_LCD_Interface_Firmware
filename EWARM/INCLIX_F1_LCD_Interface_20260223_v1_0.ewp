@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <project>
     <fileVersion>3</fileVersion>
     <configuration>
@@ -350,7 +350,7 @@
                     <state>$PROJ_DIR$/../Drivers/CMSIS/Include</state>
                     <state>$PROJ_DIR$/../USER</state>
                     <state>$PROJ_DIR$/../USER/Drive/PowerControl_Drv</state>
-                    <state>$PROJ_DIR$/../USER/Drive/OLED_SSD1322_Drv</state>
+                    <state>$PROJ_DIR$/../USER/Drive/ST7735S_Drv</state>
                     <state>$PROJ_DIR$/../USER/Drive/Button_Drv</state>
                     <state>$PROJ_DIR$/../USER/Drive/DAC_Manager</state>
                 </option>
@@ -1128,7 +1128,7 @@
                     <name>$PROJ_DIR$\..\USER\Drive\PowerControl_Drv\PowerControl_Drv.c</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\USER\Drive\OLED_SSD1322_Drv\OLED_SSD1322_Drv.c</name>
+                    <name>$PROJ_DIR$\..\USER\Drive\ST7735S_Drv\ST7735S_Drv.c</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\USER\Drive\Button_Drv\Button_Drv.c</name>
@@ -1205,6 +1205,12 @@
             </file>
             <file>
                 <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dac_ex.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_tim.c</name>
+            </file>
+            <file>
+                <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_tim_ex.c</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_ll_rcc.c</name>

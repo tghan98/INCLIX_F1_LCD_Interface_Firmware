@@ -25,7 +25,7 @@ if not "%~1" == "" goto debugFile
 
 @echo on 
 
-"C:\Program Files\IAR Systems\Embedded Workbench 9.0\common\bin\cspybat" -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_20260223_v1_0\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.general.xcl" --backend -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_20260223_v1_0\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.driver.xcl" 
+"C:\Program Files\IAR Systems\Embedded Workbench 9.0\common\bin\cspybat" -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_Firmware_dac_battery_ui_non_blocking\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.general.xcl" --backend -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_Firmware_dac_battery_ui_non_blocking\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.driver.xcl" 
 
 @echo off 
 goto end 
@@ -34,7 +34,7 @@ goto end
 
 @echo on 
 
-"C:\Program Files\IAR Systems\Embedded Workbench 9.0\common\bin\cspybat" -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_20260223_v1_0\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.general.xcl" "--debug_file=%~1" --backend -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_20260223_v1_0\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.driver.xcl" 
+"C:\Program Files\IAR Systems\Embedded Workbench 9.0\common\bin\cspybat" -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_Firmware_dac_battery_ui_non_blocking\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.general.xcl" "--debug_file=%~1" --backend -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_Firmware_dac_battery_ui_non_blocking\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.driver.xcl" 
 
 @echo off 
 :end
