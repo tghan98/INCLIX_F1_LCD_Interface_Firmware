@@ -355,7 +355,7 @@
           <state>$PROJ_DIR$/../USER/Drive/Button_Drv</state>
           <state>$PROJ_DIR$/../USER/Drive/DAC_Manager</state>
           <state>$PROJ_DIR$/../USER/Drive/EEPROM_CAT24C256_Drv</state>
-          <state>$PROJ_DIR$/../USER/Drive/OLED_SSD1322_Drv</state>
+          <state>$PROJ_DIR$/../USER/Drive/ST7735S_Drv</state>
           <state>$PROJ_DIR$/../USER/Drive/PowerControl_Drv</state>
         </option>
         <option>
@@ -1286,12 +1286,12 @@
         </file>
       </group>
       <group>
-        <name>OLED_SSD1322_Drv</name>
+        <name>ST7735S_Drv</name>
         <file>
-          <name>$PROJ_DIR$\..\USER\Drive\OLED_SSD1322_Drv\OLED_SSD1322_Drv.c</name>
+          <name>$PROJ_DIR$\..\USER\Drive\ST7735S_Drv\ST7735S_Drv.c</name>
         </file>
         <file>
-          <name>$PROJ_DIR$\..\USER\Drive\OLED_SSD1322_Drv\OLED_SSD1322_Drv.h</name>
+          <name>$PROJ_DIR$\..\USER\Drive\ST7735S_Drv\ST7735S_Drv.h</name>
         </file>
       </group>
       <group>

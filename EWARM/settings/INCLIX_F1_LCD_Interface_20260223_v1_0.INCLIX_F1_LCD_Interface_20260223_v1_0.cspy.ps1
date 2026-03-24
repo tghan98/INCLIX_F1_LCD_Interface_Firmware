@@ -23,9 +23,9 @@
 
 if ($debugfile -eq "")
 {
-& "C:\Program Files\IAR Systems\Embedded Workbench 9.0\common\bin\cspybat" -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_20260223_v1_0\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.general.xcl" --backend -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_20260223_v1_0\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.driver.xcl" 
+& "C:\Program Files\IAR Systems\Embedded Workbench 9.0\common\bin\cspybat" -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_Firmware_eeprom_nanosim\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.general.xcl" --backend -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_Firmware_eeprom_nanosim\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.driver.xcl" 
 }
 else
 {
-& "C:\Program Files\IAR Systems\Embedded Workbench 9.0\common\bin\cspybat" -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_20260223_v1_0\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.general.xcl" --debug_file=$debugfile --backend -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_20260223_v1_0\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.driver.xcl" 
+& "C:\Program Files\IAR Systems\Embedded Workbench 9.0\common\bin\cspybat" -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_Firmware_eeprom_nanosim\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.general.xcl" --debug_file=$debugfile --backend -f "C:\Users\hansu\Documents\STM32_iar_Workspace\INCLIX_F1_LCD_Interface_Firmware_eeprom_nanosim\EWARM\settings\INCLIX_F1_LCD_Interface_20260223_v1_0.INCLIX_F1_LCD_Interface_20260223_v1_0.driver.xcl" 
 }

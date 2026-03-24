@@ -10,8 +10,6 @@ int32_t User_Main_Init(void)
 
 int32_t User_Main_Run(void)
 {
-  /* 카드 삽입 테스트 무한 루프 */
   Card_Insert_Test_App_Run();
-  
   return 0;
 }

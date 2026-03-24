@@ -1,51 +1,52 @@
 /*
  * Card_Insert_Test_App.c
  * 
- * 카드 삽입 감지 및 I2C 스캔 테스트 애플리케이션
- * - PB2(Chip_EN) 입력 감시
- * - High 감지 시 카드 삽입으로 판단
- * - 20ms 대기 후 I2C2 주소 스캔
- * - ACK 응답 여부에 따라 PASS/FAIL 판정
+ * 카드 ?�입 감�? �?I2C ?�캔 ?�스???�플리�??�션
+ * - PB2(Chip_EN) ?�력 감시
+ * - High 감�? ??카드 ?�입?�로 ?�단
+ * - 20ms ?��???I2C2 주소 ?�캔
+ * - ACK ?�답 ?��????�라 PASS/FAIL ?�정
  */
 
 #include "Card_Insert_Test_App.h"
-#include "OLED_SSD1322_Drv.h"
+#include "ST7735S_Drv.h"
 #include "string.h"
 
 /* ============================================================================
- * 외부 변수 (main.c에서 선언)
+ * ?��? 변??(main.c?�서 ?�언)
  * ============================================================================ */
 extern I2C_HandleTypeDef hi2c2;
 
 /* ============================================================================
- * 매크로 정의
+ * 매크�??�의
  * ============================================================================ */
 
-#define I2C_SCAN_TIMEOUT_MS             10U        /* I2C 스캔 타임아웃 */
-#define CARD_DEBOUNCE_DELAY_MS          20U        /* 카드 감지 후 대기 시간 */
-#define I2C_ADDRESS_START               0x08U      /* I2C 스캔 시작 주소 (0x08 ~ 0x77) */
-#define I2C_ADDRESS_END                 0x77U      /* I2C 스캔 종료 주소 */
+#define I2C_SCAN_TIMEOUT_MS             10U        /* I2C ?�캔 ?�?�아??*/
+#define CARD_DEBOUNCE_DELAY_MS          20U        /* 카드 감�? ???��??�간 */
+#define I2C_ADDRESS_START               0x08U      /* I2C ?�캔 ?�작 주소 (0x08 ~ 0x77) */
+#define I2C_ADDRESS_END                 0x77U      /* I2C ?�캔 종료 주소 */
 
-/* UI 색상 설정 */
-#define TEXT_GRAY                       0x0FU      /* 텍스트 색상 (흰색) */
-#define BG_GRAY                         0x00U      /* 배경 색상 (검정색) */
-
-/* 폰트 크기 및 배치 */
-#define CHAR_W                          5U         /* 한 글자 너비 */
-#define CHAR_H                          7U         /* 한 글자 높이 */
-#define CHAR_SPACING                    1U         /* 글자 간격 */
-#define LINE_STEP                       8U         /* 줄 간격 */
-#define MARGIN_X                        4U         /* 좌측 마진 */
-#define MARGIN_Y                        2U         /* 상단 마진 */
+/* UI ?�상 ?�정 */
+#define TEXT_GRAY                       0x0FU      /* ?�스???�상 (?�색) */
+#define BG_GRAY                         0x00U      /* 배경 ?�상 (검?�색) */
+#define TEXT_RGB565                     0xFFFFU
+#define BG_RGB565                       0x0000U
+/* ?�트 ?�기 �?배치 */
+#define CHAR_W                          5U         /* ??글???�비 */
+#define CHAR_H                          7U         /* ??글???�이 */
+#define CHAR_SPACING                    1U         /* 글??간격 */
+#define LINE_STEP                       9U         /* �?간격 */
+#define MARGIN_X                        (ST7735S_VIEW_X_MIN + 2U)  /* 좌측 마진: ?�이?�포?�경계+2 */
+#define MARGIN_Y                        (ST7735S_VIEW_Y_MIN + 2U)  /* ?�단 마진: ?�이?�포?�경계+2 */
 
 /* ============================================================================
- * 정적 변수
+ * ?�적 변??
  * ============================================================================ */
 
-static uint8_t s_frame[OLED_SSD1322_FRAME_BYTES];  /* OLED 화면 버퍼 */
+static uint8_t s_frame[ST7735S_DRV_FRAME_BYTES];  /* OLED ?�면 버퍼 */
 
 /* ============================================================================
- * 함수 선언부 (내부 전용)
+ * ?�수 ?�언부 (?��? ?�용)
  * ============================================================================ */
 
 static void ClearFrame(uint8_t gray);
@@ -59,22 +60,22 @@ static void UpdateDisplay(void);
 static uint8_t ScanI2C(uint8_t *found_addr);
 
 /* ============================================================================
- * 함수 구현부
+ * ?�수 구현부
  * ============================================================================ */
 
 /*
  * Card_Insert_Test_App_Init()
- * 초기화 함수
+ * 초기???�수
  */
 void Card_Insert_Test_App_Init(void)
 {
-  /* OLED 초기화 */
-  OLED_SSD1322_Drv_Init();
+  /* OLED 초기??*/
+  ST7735S_Drv_Init();
   
-  /* 화면 클리어 */
+  /* ?�면 ?�리??*/
   ClearFrame(BG_GRAY);
   
-  /* 초기 메시지 표시 */
+  /* 초기 메시지 ?�시 */
   DrawString(MARGIN_X, MARGIN_Y + 0 * LINE_STEP, "CARD TEST READY", TEXT_GRAY);
   DrawString(MARGIN_X, MARGIN_Y + 2 * LINE_STEP, "WAITING", TEXT_GRAY);
   DrawString(MARGIN_X, MARGIN_Y + 3 * LINE_STEP, "PB2 HIGH", TEXT_GRAY);
@@ -85,7 +86,7 @@ void Card_Insert_Test_App_Init(void)
 
 /*
  * Card_Insert_Test_App_Run()
- * 메인 루프 - PB2 감시 및 I2C 스캔
+ * 메인 루프 - PB2 감시 �?I2C ?�캔
  */
 void Card_Insert_Test_App_Run(void)
 {
@@ -95,42 +96,42 @@ void Card_Insert_Test_App_Run(void)
   
   while (1)
   {
-    /* 1. PB2(Chip_EN_Pin) 입력 감시 */
+    /* 1. PB2(Chip_EN_Pin) ?�력 감시 */
     pin_state = HAL_GPIO_ReadPin(Chip_EN_GPIO_Port, Chip_EN_Pin);
     
-    if (pin_state == GPIO_PIN_SET)  /* High 감지 */
+    if (pin_state == GPIO_PIN_SET)  /* High 감�? */
     {
-      /* 2. 카드 삽입으로 판단 */
+      /* 2. 카드 ?�입?�로 ?�단 */
       ClearFrame(BG_GRAY);
       DrawString(MARGIN_X, MARGIN_Y + 0 * LINE_STEP, "1 PB2 HIGH", TEXT_GRAY);
       DrawString(MARGIN_X, MARGIN_Y + 1 * LINE_STEP, "CARD DETECTED", TEXT_GRAY);
       UpdateDisplay();
-      HAL_Delay(1500);  /* 1.5초 표시 */
+      HAL_Delay(1500);  /* 1.5�??�시 */
       
-      /* 3. 20ms 대기 */
+      /* 3. 20ms ?��?*/
       ClearFrame(BG_GRAY);
       DrawString(MARGIN_X, MARGIN_Y + 0 * LINE_STEP, "2 WAIT 20MS", TEXT_GRAY);
       DrawString(MARGIN_X, MARGIN_Y + 1 * LINE_STEP, "DEBOUNCE", TEXT_GRAY);
       UpdateDisplay();
       HAL_Delay(CARD_DEBOUNCE_DELAY_MS);
-      HAL_Delay(1000);  /* 추가 1초 표시 */
+      HAL_Delay(1000);  /* 추�? 1�??�시 */
       
-      /* 4. I2C2 주소 스캔 */
+      /* 4. I2C2 주소 ?�캔 */
       ClearFrame(BG_GRAY);
       DrawString(MARGIN_X, MARGIN_Y + 0 * LINE_STEP, "3 SCAN I2C2", TEXT_GRAY);
       DrawString(MARGIN_X, MARGIN_Y + 1 * LINE_STEP, "PB10 PB11", TEXT_GRAY);
       DrawString(MARGIN_X, MARGIN_Y + 2 * LINE_STEP, "0x08 TO 0x77", TEXT_GRAY);
       UpdateDisplay();
-      HAL_Delay(1000);  /* 1초 표시 */
+      HAL_Delay(1000);  /* 1�??�시 */
       
       i2c_found_count = ScanI2C(&found_addr);
       
-      /* 5. 결과 분석 및 표시 */
+      /* 5. 결과 분석 �??�시 */
       ClearFrame(BG_GRAY);
       
       if (i2c_found_count > 0)
       {
-        /* PASS - ACK 응답 있음 */
+        /* PASS - ACK ?�답 ?�음 */
         DrawString(MARGIN_X, MARGIN_Y + 0 * LINE_STEP, "*** PASS ***", TEXT_GRAY);
         DrawString(MARGIN_X, MARGIN_Y + 2 * LINE_STEP, "I2C ACK OK", TEXT_GRAY);
         DrawString(MARGIN_X, MARGIN_Y + 3 * LINE_STEP, "ADDR:", TEXT_GRAY);
@@ -138,7 +139,7 @@ void Card_Insert_Test_App_Run(void)
       }
       else
       {
-        /* FAIL - ACK 응답 없음 */
+        /* FAIL - ACK ?�답 ?�음 */
         DrawString(MARGIN_X, MARGIN_Y + 0 * LINE_STEP, "*** FAIL ***", TEXT_GRAY);
         DrawString(MARGIN_X, MARGIN_Y + 2 * LINE_STEP, "NO I2C ACK", TEXT_GRAY);
         DrawString(MARGIN_X, MARGIN_Y + 3 * LINE_STEP, "NO DEVICE", TEXT_GRAY);
@@ -147,15 +148,18 @@ void Card_Insert_Test_App_Run(void)
       DrawString(MARGIN_X, MARGIN_Y + 5 * LINE_STEP, "REMOVE CARD", TEXT_GRAY);
       DrawString(MARGIN_X, MARGIN_Y + 6 * LINE_STEP, "TO TEST AGAIN", TEXT_GRAY);
       UpdateDisplay();
-      HAL_Delay(3000);  /* 결과를 3초간 표시 */
+      HAL_Delay(3000);  /* 결과�?3초간 ?�시 */
       
-      /* 카드 제거 대기 (PB2 Low 될 때까지) */
-      while (HAL_GPIO_ReadPin(Chip_EN_GPIO_Port, Chip_EN_Pin) == GPIO_PIN_SET)
+      /* 카드 ?�거 ?��?: I2C ?�답 ?��??�까지 ?�링 (PB2?? ?모�??�이?�므로 I2C?�로 ?�재 ?�인) */
       {
-        HAL_Delay(100);
+        uint8_t dummy_addr = 0U;
+        while (ScanI2C(&dummy_addr) > 0U)
+        {
+          HAL_Delay(200U);
+        }
       }
       
-      /* 다시 대기 화면으로 복귀 */
+      /* ?�시 ?��??�면?�로 복�? */
       ClearFrame(BG_GRAY);
       DrawString(MARGIN_X, MARGIN_Y + 0 * LINE_STEP, "CARD TEST READY", TEXT_GRAY);
       DrawString(MARGIN_X, MARGIN_Y + 2 * LINE_STEP, "WAITING", TEXT_GRAY);
@@ -164,19 +168,19 @@ void Card_Insert_Test_App_Run(void)
       UpdateDisplay();
     }
     
-    HAL_Delay(50);  /* 50ms 주기로 폴링 */
+    HAL_Delay(50);  /* 50ms 주기�??�링 */
   }
 }
 
 /*
  * ScanI2C()
- * I2C2 버스를 스캔하여 응답하는 디바이스 검색
+ * I2C2 버스�??�캔?�여 ?�답?�는 ?�바?�스 검??
  * 
- * [인자]
- *   found_addr : 찾은 첫 번째 주소를 저장할 포인터
+ * [?�자]
+ *   found_addr : 찾�? �?번째 주소�??�?�할 ?�인??
  * 
- * [반환값]
- *   찾은 디바이스 개수
+ * [반환�?
+ *   찾�? ?�바?�스 개수
  */
 static uint8_t ScanI2C(uint8_t *found_addr)
 {
@@ -186,15 +190,15 @@ static uint8_t ScanI2C(uint8_t *found_addr)
   
   for (addr = I2C_ADDRESS_START; addr <= I2C_ADDRESS_END; addr++)
   {
-    /* I2C 디바이스 존재 여부 확인 (7비트 주소를 1비트 왼쪽 시프트) */
+    /* I2C ?�바?�스 존재 ?��? ?�인 (7비트 주소�?1비트 ?�쪽 ?�프?? */
     result = HAL_I2C_IsDeviceReady(&hi2c2, (uint16_t)(addr << 1), 1, I2C_SCAN_TIMEOUT_MS);
     
     if (result == HAL_OK)
     {
-      /* ACK 응답 받음 - 디바이스 발견 */
+      /* ACK ?�답 받음 - ?�바?�스 발견 */
       if (count == 0)
       {
-        *found_addr = addr;  /* 첫 번째 발견된 주소 저장 */
+        *found_addr = addr;  /* �?번째 발견??주소 ?�??*/
       }
       count++;
     }
@@ -204,33 +208,33 @@ static uint8_t ScanI2C(uint8_t *found_addr)
 }
 
 /* ============================================================================
- * 화면 그리기 함수들
+ * ?�면 그리�??�수??
  * ============================================================================ */
 
 /*
  * ClearFrame()
- * 프레임버퍼를 지정된 색상으로 초기화
+ * ?�레?�버?��? 지?�된 ?�상?�로 초기??
  */
 static void ClearFrame(uint8_t gray)
 {
-  uint8_t packed_gray = (uint8_t)(((gray & 0x0FU) << 4) | (gray & 0x0FU));
-  memset(s_frame, packed_gray, sizeof(s_frame));
+  (void)gray;
+  ST7735S_Drv_Clear(BG_RGB565);
 }
 
 /*
  * SetPixel()
- * 프레임버퍼의 특정 좌표에 픽셀값 설정
+ * ?�레?�버?�의 ?�정 좌표???��?�??�정
  */
 static void SetPixel(uint32_t x, uint32_t y, uint8_t gray)
 {
   uint32_t index;
   
-  if ((x >= OLED_SSD1322_WIDTH) || (y >= OLED_SSD1322_HEIGHT))
+  if ((x >= ST7735S_DRV_WIDTH) || (y >= ST7735S_DRV_HEIGHT))
   {
     return;
   }
   
-  index = (y * (OLED_SSD1322_WIDTH / 2U)) + (x / 2U);
+  index = (y * (ST7735S_DRV_WIDTH / 2U)) + (x / 2U);
   
   if ((x & 1U) == 0U)
   {
@@ -244,7 +248,7 @@ static void SetPixel(uint32_t x, uint32_t y, uint8_t gray)
 
 /*
  * GetGlyph()
- * 문자 코드에 해당하는 폰트 글리프 데이터 반환
+ * 문자 코드???�당?�는 ?�트 글리프 ?�이??반환
  */
 static const uint8_t *GetGlyph(char ch)
 {
@@ -359,44 +363,27 @@ static const uint8_t *GetGlyph(char ch)
 
 /*
  * DrawChar()
- * 지정된 위치에 문자 그리기
+ * 지?�된 ?�치??문자 그리�?
  */
 static void DrawChar(uint32_t x, uint32_t y, char ch, uint8_t gray)
 {
-  const uint8_t *glyph = GetGlyph(ch);
-  uint32_t col, row;
-  
-  for (col = 0; col < CHAR_W; col++)
-  {
-    for (row = 0; row < CHAR_H; row++)
-    {
-      if ((glyph[col] & (1U << row)) != 0U)
-      {
-        SetPixel(x + col, y + row, gray);
-      }
-    }
-  }
+  (void)gray;
+  ST7735S_Drv_DrawChar5x7((uint16_t)x, (uint16_t)y, ch, TEXT_RGB565, BG_RGB565);
 }
 
 /*
  * DrawString()
- * 지정된 위치에 문자열 그리기
+ * 지?�된 ?�치??문자??그리�?
  */
 static void DrawString(uint32_t x, uint32_t y, const char *text, uint8_t gray)
 {
-  uint32_t cursor_x = x;
-  
-  while (*text != '\0')
-  {
-    DrawChar(cursor_x, y, *text, gray);
-    cursor_x += (CHAR_W + CHAR_SPACING);
-    text++;
-  }
+  (void)gray;
+  ST7735S_Drv_DrawString5x7((uint16_t)x, (uint16_t)y, text, TEXT_RGB565, BG_RGB565);
 }
 
 /*
  * DrawHex8()
- * 8비트 값을 16진수로 표시
+ * 8비트 값을 16진수�??�시
  */
 static void DrawHex8(uint32_t x, uint32_t y, uint8_t value, uint8_t gray)
 {
@@ -410,9 +397,9 @@ static void DrawHex8(uint32_t x, uint32_t y, uint8_t value, uint8_t gray)
 
 /*
  * UpdateDisplay()
- * 프레임버퍼를 OLED에 전송
+ * ?�레?�버?��? OLED???�송
  */
 static void UpdateDisplay(void)
 {
-  OLED_SSD1322_Drv_WriteFrame(s_frame);
+  /* Text is drawn directly to ST7735S in DrawString/DrawChar. */
 }
