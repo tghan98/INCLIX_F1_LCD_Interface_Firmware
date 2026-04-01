@@ -10,11 +10,19 @@
 #define ST7735S_MADCTL_DEFAULT        0x08U
 #define ST7735S_COLMOD_RGB565         0x05U
 #define ST7735S_TUNING_PATTERN_MODE   0U
+#define ST7735S_DEBUG_RECT_ENABLE     1U
+#define ST7735S_DEBUG_RECT_COLOR      0xFFFFU
+#define ST7735S_DEBUG_RECT_X0         23U
+#define ST7735S_DEBUG_RECT_Y0         2U
+#define ST7735S_DEBUG_RECT_X1         107U
+#define ST7735S_DEBUG_RECT_Y1         95U
 #define LCD_BL_ACTIVE_HIGH            1U
 #define LCD_BL_DEFAULT_PERCENT        90U
 
 extern SPI_HandleTypeDef hspi2;
 extern TIM_HandleTypeDef htim14;
+
+static void st7735s_draw_debug_rect(void);
 
 static void lcd_select(uint8_t selected)
 {
@@ -240,6 +248,7 @@ void ST7735S_Drv_Init(void)
 #if (ST7735S_TUNING_PATTERN_MODE != 0U)
   st7735s_draw_tuning_pattern();
 #endif
+  st7735s_draw_debug_rect();
 }
 
 void ST7735S_Drv_WriteFrame(const uint8_t *frame)
@@ -247,6 +256,7 @@ void ST7735S_Drv_WriteFrame(const uint8_t *frame)
 #if (ST7735S_TUNING_PATTERN_MODE != 0U)
   (void)frame;
   st7735s_draw_tuning_pattern();
+  st7735s_draw_debug_rect();
   return;
 #else
   static const uint16_t gray_lut_565[16] =
@@ -297,6 +307,7 @@ void ST7735S_Drv_WriteFrame(const uint8_t *frame)
       gray_mid = (uint8_t)((gray_left + gray_right) >> 1);
 
       px = gray_lut_565[gray_mid];
+
       tx_line[dst_idx++] = (uint8_t)(px >> 8);
       tx_line[dst_idx++] = (uint8_t)(px & 0xFFU);
     }
@@ -304,5 +315,217 @@ void ST7735S_Drv_WriteFrame(const uint8_t *frame)
     (void)HAL_SPI_Transmit(&hspi2, tx_line, (uint16_t)sizeof(tx_line), HAL_MAX_DELAY);
   }
   lcd_select(0U);
+  st7735s_draw_debug_rect();
 #endif
+}
+
+static void st7735s_draw_pixel(uint16_t x, uint16_t y, uint16_t rgb565)
+{
+  uint8_t px[2];
+
+  if ((x >= ST7735S_PANEL_WIDTH) || (y >= ST7735S_PANEL_HEIGHT))
+  {
+    return;
+  }
+
+  /* Hard clip to measured visible area (bezel-safe bounds) */
+  if ((x < ST7735S_VIEW_X_MIN) || (x > ST7735S_VIEW_X_MAX) ||
+      (y < ST7735S_VIEW_Y_MIN) || (y > ST7735S_VIEW_Y_MAX))
+  {
+    return;
+  }
+
+  st7735s_set_window((uint16_t)(ST7735S_RAM_OFFSET_X + x),
+                     (uint16_t)(ST7735S_RAM_OFFSET_Y + y),
+                     (uint16_t)(ST7735S_RAM_OFFSET_X + x),
+                     (uint16_t)(ST7735S_RAM_OFFSET_Y + y));
+  lcd_write_cmd(0x2CU); /* RAMWR */
+
+  px[0] = (uint8_t)(rgb565 >> 8);
+  px[1] = (uint8_t)(rgb565 & 0xFFU);
+  lcd_write_data(px, 2U);
+}
+
+static void st7735s_draw_debug_rect(void)
+{
+#if (ST7735S_DEBUG_RECT_ENABLE != 0U)
+  uint16_t x;
+  uint16_t y;
+
+  /* 상단선: (X0,Y0) -> (X1,Y0) */
+  for (x = ST7735S_DEBUG_RECT_X0; x <= ST7735S_DEBUG_RECT_X1; x++)
+  {
+    st7735s_draw_pixel(x, ST7735S_DEBUG_RECT_Y0, ST7735S_DEBUG_RECT_COLOR);
+  }
+
+  /* 하단선: (X0,Y1) -> (X1,Y1) */
+  for (x = ST7735S_DEBUG_RECT_X0; x <= ST7735S_DEBUG_RECT_X1; x++)
+  {
+    st7735s_draw_pixel(x, ST7735S_DEBUG_RECT_Y1, ST7735S_DEBUG_RECT_COLOR);
+  }
+
+  /* 좌측 세로선: (X0,Y0) -> (X0,Y1) */
+  for (y = ST7735S_DEBUG_RECT_Y0; y <= ST7735S_DEBUG_RECT_Y1; y++)
+  {
+    st7735s_draw_pixel(ST7735S_DEBUG_RECT_X0, y, ST7735S_DEBUG_RECT_COLOR);
+  }
+
+  /* 우측 세로선: (X1,Y0) -> (X1,Y1) */
+  for (y = ST7735S_DEBUG_RECT_Y0; y <= ST7735S_DEBUG_RECT_Y1; y++)
+  {
+    st7735s_draw_pixel(ST7735S_DEBUG_RECT_X1, y, ST7735S_DEBUG_RECT_COLOR);
+  }
+#endif
+}
+
+static const uint8_t *st7735s_get_glyph_3x5(char ch)
+{
+  static const uint8_t glyph_space[3] = {0x00, 0x00, 0x00};
+  static const uint8_t glyph_colon[3] = {0x00, 0x0AU, 0x00};
+  static const uint8_t glyph_slash[3] = {0x10, 0x08, 0x04};
+  static const uint8_t glyph_gt[3] = {0x04, 0x0AU, 0x11};
+  static const uint8_t glyph_0[3] = {0x1FU, 0x11U, 0x1FU};
+  static const uint8_t glyph_1[3] = {0x00U, 0x1FU, 0x00U};
+  static const uint8_t glyph_2[3] = {0x1DU, 0x15U, 0x17U};
+  static const uint8_t glyph_3[3] = {0x15U, 0x15U, 0x1FU};
+  static const uint8_t glyph_4[3] = {0x07U, 0x04U, 0x1FU};
+  static const uint8_t glyph_5[3] = {0x17U, 0x15U, 0x1DU};
+  static const uint8_t glyph_6[3] = {0x1FU, 0x15U, 0x1DU};
+  static const uint8_t glyph_7[3] = {0x01U, 0x01U, 0x1FU};
+  static const uint8_t glyph_8[3] = {0x1FU, 0x15U, 0x1FU};
+  static const uint8_t glyph_9[3] = {0x17U, 0x15U, 0x1FU};
+  static const uint8_t glyph_A[3] = {0x1FU, 0x05U, 0x1FU};
+  static const uint8_t glyph_B[3] = {0x1FU, 0x15U, 0x0AU};
+  static const uint8_t glyph_C[3] = {0x1FU, 0x11U, 0x11U};
+  static const uint8_t glyph_D[3] = {0x1FU, 0x11U, 0x0EU};
+  static const uint8_t glyph_E[3] = {0x1FU, 0x15U, 0x11U};
+  static const uint8_t glyph_F[3] = {0x1FU, 0x05U, 0x01U};
+  static const uint8_t glyph_G[3] = {0x1FU, 0x11U, 0x1DU};
+  static const uint8_t glyph_H[3] = {0x1FU, 0x04U, 0x1FU};
+  static const uint8_t glyph_I[3] = {0x11U, 0x1FU, 0x11U};
+  static const uint8_t glyph_K[3] = {0x1FU, 0x04U, 0x1BU};
+  static const uint8_t glyph_L[3] = {0x1FU, 0x10U, 0x10U};
+  static const uint8_t glyph_M[3] = {0x1FU, 0x02U, 0x1FU};
+  static const uint8_t glyph_N[3] = {0x1FU, 0x01U, 0x1EU};
+  static const uint8_t glyph_O[3] = {0x1FU, 0x11U, 0x1FU};
+  static const uint8_t glyph_P[3] = {0x1FU, 0x05U, 0x07U};
+  static const uint8_t glyph_R[3] = {0x1FU, 0x0DU, 0x17U};
+  static const uint8_t glyph_S[3] = {0x17U, 0x15U, 0x1DU};
+  static const uint8_t glyph_T[3] = {0x01U, 0x1FU, 0x01U};
+  static const uint8_t glyph_U[3] = {0x1FU, 0x10U, 0x1FU};
+  static const uint8_t glyph_V[3] = {0x0FU, 0x10U, 0x0FU};
+  static const uint8_t glyph_W[3] = {0x1FU, 0x08U, 0x1FU};
+  static const uint8_t glyph_X[3] = {0x1BU, 0x04U, 0x1BU};
+  static const uint8_t glyph_Y[3] = {0x03U, 0x1CU, 0x03U};
+
+  switch (ch)
+  {
+    case ' ': return glyph_space;
+    case ':': return glyph_colon;
+    case '/': return glyph_slash;
+    case '>': return glyph_gt;
+    case '0': return glyph_0;
+    case '1': return glyph_1;
+    case '2': return glyph_2;
+    case '3': return glyph_3;
+    case '4': return glyph_4;
+    case '5': return glyph_5;
+    case '6': return glyph_6;
+    case '7': return glyph_7;
+    case '8': return glyph_8;
+    case '9': return glyph_9;
+    case 'A': return glyph_A;
+    case 'B': return glyph_B;
+    case 'C': return glyph_C;
+    case 'D': return glyph_D;
+    case 'E': return glyph_E;
+    case 'F': return glyph_F;
+    case 'G': return glyph_G;
+    case 'H': return glyph_H;
+    case 'I': return glyph_I;
+    case 'K': return glyph_K;
+    case 'L': return glyph_L;
+    case 'M': return glyph_M;
+    case 'N': return glyph_N;
+    case 'O': return glyph_O;
+    case 'P': return glyph_P;
+    case 'R': return glyph_R;
+    case 'S': return glyph_S;
+    case 'T': return glyph_T;
+    case 'U': return glyph_U;
+    case 'V': return glyph_V;
+    case 'W': return glyph_W;
+    case 'X': return glyph_X;
+    case 'Y': return glyph_Y;
+    default:  return glyph_space;
+  }
+}
+
+void ST7735S_Drv_DrawChar3x5(uint16_t x, uint16_t y, char ch, uint16_t fg_rgb565, uint16_t bg_rgb565)
+{
+  const uint8_t *glyph;
+  uint16_t row;
+  uint16_t col;
+
+  glyph = st7735s_get_glyph_3x5(ch);
+
+  for (row = 0U; row < 5U; row++)
+  {
+    for (col = 0U; col < 4U; col++)
+    {
+      uint16_t px = bg_rgb565;
+
+      if ((col < 3U) && ((glyph[col] & (uint8_t)(1U << row)) != 0U))
+      {
+        px = fg_rgb565;
+      }
+
+      st7735s_draw_pixel((uint16_t)(x + col), (uint16_t)(y + row), px);
+    }
+  }
+}
+
+void ST7735S_Drv_DrawString3x5(uint16_t x, uint16_t y, const char *text, uint16_t fg_rgb565, uint16_t bg_rgb565)
+{
+  uint16_t cursor_x = x;
+
+  if (text == NULL)
+  {
+    return;
+  }
+
+  while (*text != '\0')
+  {
+    ST7735S_Drv_DrawChar3x5(cursor_x, y, *text, fg_rgb565, bg_rgb565);
+    cursor_x = (uint16_t)(cursor_x + 4U);
+    text++;
+  }
+}
+
+void ST7735S_Drv_Clear(uint16_t rgb565)
+{
+  uint8_t line[(uint16_t)(ST7735S_PANEL_WIDTH * 2U)];
+  uint16_t y;
+  uint16_t x;
+
+  for (x = 0U; x < ST7735S_PANEL_WIDTH; x++)
+  {
+    line[2U * x] = (uint8_t)(rgb565 >> 8);
+    line[(2U * x) + 1U] = (uint8_t)(rgb565 & 0xFFU);
+  }
+
+  st7735s_set_window((uint16_t)ST7735S_RAM_OFFSET_X,
+                     (uint16_t)ST7735S_RAM_OFFSET_Y,
+                     (uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_PANEL_WIDTH - 1U),
+                     (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_PANEL_HEIGHT - 1U));
+  lcd_write_cmd(0x2CU); /* RAMWR */
+
+  HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_SET);
+  lcd_select(1U);
+  for (y = 0U; y < ST7735S_PANEL_HEIGHT; y++)
+  {
+    (void)HAL_SPI_Transmit(&hspi2, line, (uint16_t)sizeof(line), HAL_MAX_DELAY);
+  }
+  lcd_select(0U);
+  st7735s_draw_debug_rect();
 }

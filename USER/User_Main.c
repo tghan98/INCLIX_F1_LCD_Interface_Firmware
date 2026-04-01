@@ -1,8 +1,8 @@
 #include "User_Main.h"
 
 #include "Button_Interface.h"
-#include "ImageSlide_App.h"
 #include "BatteryMonitor_Interface.h"
+#include "App/BatteryDisplay_App/BatteryDisplay_App.h"
 
 int32_t User_Main_Init(void)
 {
@@ -12,9 +12,11 @@ int32_t User_Main_Init(void)
   /* 배터리 모니터링 초기화 */
   BatteryMonitor_Interface_Init();
   
+  /* 배터리 디스플레이 초기화 */
+  BatteryDisplay_App_Init();
+  
   /* PowerControl is intentionally disabled while validating OLED slide show. */
   /* PowerControl_App_Init(); */
-  ImageSlide_App_Init();
   return 0;
 }
 
@@ -26,8 +28,8 @@ int32_t User_Main_Run(void)
   /* 배터리 레벨 측정 */
   BatteryMonitor_Interface_Run();
   
-  /* 슬라이드 앱 실행 (이벤트 큐 읽기) */
-  ImageSlide_App_Run();
-  /* PowerControl_App_Run(); */
+  /* 배터리 디스플레이 (LCD에 배터리 상태 표시) */
+  BatteryDisplay_App_Run();
+  
   return 0;
 }

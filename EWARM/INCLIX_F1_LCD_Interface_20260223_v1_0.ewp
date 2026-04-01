@@ -341,7 +341,6 @@
                     <name>CCIncludePath2</name>
                     <state>$PROJ_DIR$/../Core/Inc</state>
                     <state>$PROJ_DIR$/../USER/App/PowerControl_App</state>
-                    <state>$PROJ_DIR$/../USER/App/ImageSlide_App</state>
                     <state>$PROJ_DIR$/../USER/App/Button_App</state>
                     <state>$PROJ_DIR$/../USER/App/BatteryMonitor_App</state>
                     <state>$PROJ_DIR$/../Drivers/STM32G0xx_HAL_Driver/Inc</state>
@@ -1110,10 +1109,9 @@
                     <name>$PROJ_DIR$\..\USER\App\Button_App\Button_Interface.c</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_App.c</name>
+                    <name>$PROJ_DIR$\..\USER\App\BatteryDisplay_App\BatteryDisplay_App.c</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\USER\App\ImageSlide_App\ImageSlide_Assets.c</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\USER\App\BatteryMonitor_App\BatteryMonitor_App.c</name>
