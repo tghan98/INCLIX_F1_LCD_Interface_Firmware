@@ -2,7 +2,7 @@
 #include "string.h"
 
 #define ST7735S_PANEL_WIDTH           128U
-#define ST7735S_PANEL_HEIGHT          96U
+#define ST7735S_PANEL_HEIGHT          97U
 #define ST7735S_RAM_OFFSET_X          0U
 #define ST7735S_RAM_OFFSET_Y          32U
 #define ST7735S_FRAME_OFFSET_X        0U
@@ -10,20 +10,17 @@
 #define ST7735S_MADCTL_DEFAULT        0x08U
 #define ST7735S_COLMOD_RGB565         0x05U
 #define ST7735S_TUNING_PATTERN_MODE   0U
-#define ST7735S_DEBUG_RECT_ENABLE     1U
-#define ST7735S_DEBUG_RECT_COLOR      0xFFFFU
-#define ST7735S_DEBUG_RECT_X0         23U
-#define ST7735S_DEBUG_RECT_Y0         2U
-#define ST7735S_DEBUG_RECT_X1         107U
-#define ST7735S_DEBUG_RECT_Y1         95U
 #define LCD_BL_ACTIVE_HIGH            1U
 #define LCD_BL_DEFAULT_PERCENT        90U
 
 extern SPI_HandleTypeDef hspi2;
 extern TIM_HandleTypeDef htim14;
 
-static void st7735s_draw_debug_rect(void);
-
+/**
+ * @brief  LCD CS 핀을 제어합니다. (Active-Low)
+ * @param  selected 1: 선택, 0: 해제
+ * @retval 없음
+ */
 static void lcd_select(uint8_t selected)
 {
   GPIO_PinState cs_state;
@@ -40,6 +37,11 @@ static void lcd_select(uint8_t selected)
   HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, cs_state);
 }
 
+/**
+ * @brief  LCD 명령 1바이트를 전송합니다.
+ * @param  cmd 전송할 명령 값
+ * @retval 없음
+ */
 static void lcd_write_cmd(uint8_t cmd)
 {
   HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_RESET);
@@ -48,6 +50,12 @@ static void lcd_write_cmd(uint8_t cmd)
   lcd_select(0U);
 }
 
+/**
+ * @brief  LCD 데이터 버퍼를 전송합니다.
+ * @param  data 전송할 데이터 포인터
+ * @param  len  전송 바이트 수
+ * @retval 없음
+ */
 static void lcd_write_data(const uint8_t *data, uint16_t len)
 {
   HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_SET);
@@ -56,11 +64,21 @@ static void lcd_write_data(const uint8_t *data, uint16_t len)
   lcd_select(0U);
 }
 
+/**
+ * @brief  데이터 1바이트를 전송합니다.
+ * @param  data 전송할 1바이트 데이터
+ * @retval 없음
+ */
 static void lcd_write_data8(uint8_t data)
 {
   lcd_write_data(&data, 1U);
 }
 
+/**
+ * @brief  백라이트 밝기를 퍼센트로 설정합니다.
+ * @param  percent 0~100
+ * @retval 없음
+ */
 static void lcd_backlight_set_percent(uint8_t percent)
 {
   uint32_t pulse;
@@ -85,12 +103,24 @@ static void lcd_backlight_set_percent(uint8_t percent)
 #endif
 }
 
+/**
+ * @brief  백라이트 PWM 출력을 시작하고 기본 밝기를 적용합니다.
+ * @param  없음
+ * @retval 없음
+ */
 static void lcd_backlight_init(void)
 {
   (void)HAL_TIM_PWM_Start(&htim14, TIM_CHANNEL_1);
   lcd_backlight_set_percent(LCD_BL_DEFAULT_PERCENT);
 }
 
+/**
+ * @brief  명령과 데이터를 연속으로 전송합니다.
+ * @param  cmd  명령 값
+ * @param  data 데이터 포인터
+ * @param  len  데이터 길이
+ * @retval 없음
+ */
 static void lcd_write_cmd_with_data(uint8_t cmd, const uint8_t *data, uint16_t len)
 {
   lcd_write_cmd(cmd);
@@ -100,6 +130,11 @@ static void lcd_write_cmd_with_data(uint8_t cmd, const uint8_t *data, uint16_t l
   }
 }
 
+/**
+ * @brief  LCD 하드웨어 리셋 시퀀스를 수행합니다.
+ * @param  없음
+ * @retval 없음
+ */
 static void lcd_hard_reset(void)
 {
   HAL_GPIO_WritePin(LCD_RST_GPIO_Port, LCD_RST_Pin, GPIO_PIN_RESET);
@@ -108,6 +143,14 @@ static void lcd_hard_reset(void)
   HAL_Delay(120U);
 }
 
+/**
+ * @brief  GRAM 쓰기 윈도우(사각형 영역)를 설정합니다.
+ * @param  x_start 시작 X
+ * @param  y_start 시작 Y
+ * @param  x_end   끝 X
+ * @param  y_end   끝 Y
+ * @retval 없음
+ */
 static void st7735s_set_window(uint16_t x_start, uint16_t y_start, uint16_t x_end, uint16_t y_end)
 {
   uint8_t data[4];
@@ -127,6 +170,11 @@ static void st7735s_set_window(uint16_t x_start, uint16_t y_start, uint16_t x_en
   lcd_write_data(data, (uint16_t)sizeof(data));
 }
 
+/**
+ * @brief  패널 전체를 검정색으로 클리어합니다.
+ * @param  없음
+ * @retval 없음
+ */
 static void st7735s_clear_black(void)
 {
   uint8_t line[(uint16_t)(ST7735S_PANEL_WIDTH * 2U)];
@@ -148,6 +196,11 @@ static void st7735s_clear_black(void)
   lcd_select(0U);
 }
 
+/**
+ * @brief  4비트 그레이 값을 RGB565로 변환합니다.
+ * @param  gray4 0~15 그레이 값
+ * @retval RGB565 색상값
+ */
 static uint16_t st7735s_gray_to_565(uint8_t gray4)
 {
   uint8_t v8;
@@ -163,6 +216,11 @@ static uint16_t st7735s_gray_to_565(uint8_t gray4)
   return (uint16_t)(((uint16_t)r5 << 11) | ((uint16_t)g6 << 5) | (uint16_t)b5);
 }
 
+/**
+ * @brief  튜닝 패턴(단색 전체 채우기)을 출력합니다.
+ * @param  없음
+ * @retval 없음
+ */
 static void st7735s_draw_tuning_pattern(void)
 {
   uint8_t tx_line[(uint16_t)(ST7735S_PANEL_WIDTH * 2U)];
@@ -195,6 +253,11 @@ static void st7735s_draw_tuning_pattern(void)
   lcd_select(0U);
 }
 
+/**
+ * @brief  LCD 초기화를 수행합니다.
+ * @param  없음
+ * @retval 없음
+ */
 void ST7735S_Drv_Init(void)
 {
   static const uint8_t frmctr1[] = {0x01U, 0x2CU, 0x2DU};
@@ -248,15 +311,18 @@ void ST7735S_Drv_Init(void)
 #if (ST7735S_TUNING_PATTERN_MODE != 0U)
   st7735s_draw_tuning_pattern();
 #endif
-  st7735s_draw_debug_rect();
 }
 
+/**
+ * @brief  4bpp 프레임을 LCD로 출력합니다. (256x64 -> 128x64 downsample)
+ * @param  frame 프레임 버퍼 포인터
+ * @retval 없음
+ */
 void ST7735S_Drv_WriteFrame(const uint8_t *frame)
 {
 #if (ST7735S_TUNING_PATTERN_MODE != 0U)
   (void)frame;
   st7735s_draw_tuning_pattern();
-  st7735s_draw_debug_rect();
   return;
 #else
   static const uint16_t gray_lut_565[16] =
@@ -315,30 +381,30 @@ void ST7735S_Drv_WriteFrame(const uint8_t *frame)
     (void)HAL_SPI_Transmit(&hspi2, tx_line, (uint16_t)sizeof(tx_line), HAL_MAX_DELAY);
   }
   lcd_select(0U);
-  st7735s_draw_debug_rect();
 #endif
 }
 
+/**
+ * @brief  논리 좌표 기준으로 1픽셀을 출력합니다.
+ * @param  x 논리 X 좌표
+ * @param  y 논리 Y 좌표
+ * @param  rgb565 픽셀 색상
+ * @retval 없음
+ */
 static void st7735s_draw_pixel(uint16_t x, uint16_t y, uint16_t rgb565)
 {
   uint8_t px[2];
 
-  if ((x >= ST7735S_PANEL_WIDTH) || (y >= ST7735S_PANEL_HEIGHT))
+  /* Clip to logical coordinate bounds: (0,0) = top-left of visible area */
+  if ((x >= (uint16_t)ST7735S_LOGICAL_WIDTH) || (y >= (uint16_t)ST7735S_LOGICAL_HEIGHT))
   {
     return;
   }
 
-  /* Hard clip to measured visible area (bezel-safe bounds) */
-  if ((x < ST7735S_VIEW_X_MIN) || (x > ST7735S_VIEW_X_MAX) ||
-      (y < ST7735S_VIEW_Y_MIN) || (y > ST7735S_VIEW_Y_MAX))
-  {
-    return;
-  }
-
-  st7735s_set_window((uint16_t)(ST7735S_RAM_OFFSET_X + x),
-                     (uint16_t)(ST7735S_RAM_OFFSET_Y + y),
-                     (uint16_t)(ST7735S_RAM_OFFSET_X + x),
-                     (uint16_t)(ST7735S_RAM_OFFSET_Y + y));
+  st7735s_set_window((uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_VIEW_X_MIN + x),
+                     (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_VIEW_Y_MIN + y),
+                     (uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_VIEW_X_MIN + x),
+                     (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_VIEW_Y_MIN + y));
   lcd_write_cmd(0x2CU); /* RAMWR */
 
   px[0] = (uint8_t)(rgb565 >> 8);
@@ -346,38 +412,11 @@ static void st7735s_draw_pixel(uint16_t x, uint16_t y, uint16_t rgb565)
   lcd_write_data(px, 2U);
 }
 
-static void st7735s_draw_debug_rect(void)
-{
-#if (ST7735S_DEBUG_RECT_ENABLE != 0U)
-  uint16_t x;
-  uint16_t y;
-
-  /* 상단선: (X0,Y0) -> (X1,Y0) */
-  for (x = ST7735S_DEBUG_RECT_X0; x <= ST7735S_DEBUG_RECT_X1; x++)
-  {
-    st7735s_draw_pixel(x, ST7735S_DEBUG_RECT_Y0, ST7735S_DEBUG_RECT_COLOR);
-  }
-
-  /* 하단선: (X0,Y1) -> (X1,Y1) */
-  for (x = ST7735S_DEBUG_RECT_X0; x <= ST7735S_DEBUG_RECT_X1; x++)
-  {
-    st7735s_draw_pixel(x, ST7735S_DEBUG_RECT_Y1, ST7735S_DEBUG_RECT_COLOR);
-  }
-
-  /* 좌측 세로선: (X0,Y0) -> (X0,Y1) */
-  for (y = ST7735S_DEBUG_RECT_Y0; y <= ST7735S_DEBUG_RECT_Y1; y++)
-  {
-    st7735s_draw_pixel(ST7735S_DEBUG_RECT_X0, y, ST7735S_DEBUG_RECT_COLOR);
-  }
-
-  /* 우측 세로선: (X1,Y0) -> (X1,Y1) */
-  for (y = ST7735S_DEBUG_RECT_Y0; y <= ST7735S_DEBUG_RECT_Y1; y++)
-  {
-    st7735s_draw_pixel(ST7735S_DEBUG_RECT_X1, y, ST7735S_DEBUG_RECT_COLOR);
-  }
-#endif
-}
-
+/**
+ * @brief  3x5 글꼴 비트맵 포인터를 반환합니다.
+ * @param  ch 출력할 문자
+ * @retval 글꼴 데이터 포인터
+ */
 static const uint8_t *st7735s_get_glyph_3x5(char ch)
 {
   static const uint8_t glyph_space[3] = {0x00, 0x00, 0x00};
@@ -461,30 +500,88 @@ static const uint8_t *st7735s_get_glyph_3x5(char ch)
   }
 }
 
+/**
+ * @brief  3x5 글자 1개를 출력합니다.
+ * @param  x 시작 X 좌표
+ * @param  y 시작 Y 좌표
+ * @param  ch 출력할 문자
+ * @param  fg_rgb565 글자색
+ * @param  bg_rgb565 배경색
+ * @retval 없음
+ */
 void ST7735S_Drv_DrawChar3x5(uint16_t x, uint16_t y, char ch, uint16_t fg_rgb565, uint16_t bg_rgb565)
 {
   const uint8_t *glyph;
+  uint8_t cell_buf[4U * 5U * 2U]; /* 40 bytes: 4 cols x 5 rows x 2 bytes/pixel (RGB565) */
+  uint16_t buf_idx;
   uint16_t row;
   uint16_t col;
+  uint16_t px;
+
+  /* Full out-of-bounds: nothing to draw */
+  if ((x >= (uint16_t)ST7735S_LOGICAL_WIDTH) || (y >= (uint16_t)ST7735S_LOGICAL_HEIGHT))
+  {
+    return;
+  }
 
   glyph = st7735s_get_glyph_3x5(ch);
 
-  for (row = 0U; row < 5U; row++)
+  /* Optimized path: entire 4x5 cell fits within logical bounds.
+   * Build pixel buffer in CPU, then send in one set_window + bulk SPI transfer.
+   * SPI transactions: 4 (vs 80 per-pixel). */
+  if ((x <= (uint16_t)(ST7735S_LOGICAL_WIDTH - 4U)) &&
+      (y <= (uint16_t)(ST7735S_LOGICAL_HEIGHT - 5U)))
   {
-    for (col = 0U; col < 4U; col++)
+    buf_idx = 0U;
+    for (row = 0U; row < 5U; row++)
     {
-      uint16_t px = bg_rgb565;
-
-      if ((col < 3U) && ((glyph[col] & (uint8_t)(1U << row)) != 0U))
+      for (col = 0U; col < 4U; col++)
       {
-        px = fg_rgb565;
+        px = bg_rgb565;
+        if ((col < 3U) && ((glyph[col] & (uint8_t)(1U << row)) != 0U))
+        {
+          px = fg_rgb565;
+        }
+        cell_buf[buf_idx++] = (uint8_t)(px >> 8);
+        cell_buf[buf_idx++] = (uint8_t)(px & 0xFFU);
       }
+    }
 
-      st7735s_draw_pixel((uint16_t)(x + col), (uint16_t)(y + row), px);
+    st7735s_set_window(
+      (uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_VIEW_X_MIN + x),
+      (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_VIEW_Y_MIN + y),
+      (uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_VIEW_X_MIN + x + 3U),
+      (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_VIEW_Y_MIN + y + 4U));
+    lcd_write_cmd(0x2CU); /* RAMWR */
+    lcd_write_data(cell_buf, (uint16_t)sizeof(cell_buf));
+  }
+  else
+  {
+    /* Partial clip fallback: per-pixel rendering with individual clipping */
+    for (row = 0U; row < 5U; row++)
+    {
+      for (col = 0U; col < 4U; col++)
+      {
+        px = bg_rgb565;
+        if ((col < 3U) && ((glyph[col] & (uint8_t)(1U << row)) != 0U))
+        {
+          px = fg_rgb565;
+        }
+        st7735s_draw_pixel((uint16_t)(x + col), (uint16_t)(y + row), px);
+      }
     }
   }
 }
 
+/**
+ * @brief  문자열을 3x5 폰트로 출력합니다.
+ * @param  x 시작 X 좌표
+ * @param  y 시작 Y 좌표
+ * @param  text 출력할 문자열
+ * @param  fg_rgb565 글자색
+ * @param  bg_rgb565 배경색
+ * @retval 없음
+ */
 void ST7735S_Drv_DrawString3x5(uint16_t x, uint16_t y, const char *text, uint16_t fg_rgb565, uint16_t bg_rgb565)
 {
   uint16_t cursor_x = x;
@@ -502,6 +599,11 @@ void ST7735S_Drv_DrawString3x5(uint16_t x, uint16_t y, const char *text, uint16_
   }
 }
 
+/**
+ * @brief  패널을 지정 색상으로 클리어합니다.
+ * @param  rgb565 채울 색상
+ * @retval 없음
+ */
 void ST7735S_Drv_Clear(uint16_t rgb565)
 {
   uint8_t line[(uint16_t)(ST7735S_PANEL_WIDTH * 2U)];
@@ -527,5 +629,13 @@ void ST7735S_Drv_Clear(uint16_t rgb565)
     (void)HAL_SPI_Transmit(&hspi2, line, (uint16_t)sizeof(line), HAL_MAX_DELAY);
   }
   lcd_select(0U);
-  st7735s_draw_debug_rect();
+
+  /* Permanent marker: final outer corners of visible area. */
+  /* 임시 테스트: 4점 마커 주석처리 - 아래쪽 불규칙한 선 원인 파악용 */
+  /*
+  st7735s_draw_pixel(0U, 0U, 0xFFFFU);
+  st7735s_draw_pixel((uint16_t)(ST7735S_LOGICAL_WIDTH - 1U), 0U, 0xFFFFU);
+  st7735s_draw_pixel(0U, (uint16_t)(ST7735S_LOGICAL_HEIGHT - 1U), 0xFFFFU);
+  st7735s_draw_pixel((uint16_t)(ST7735S_LOGICAL_WIDTH - 1U), (uint16_t)(ST7735S_LOGICAL_HEIGHT - 1U), 0xFFFFU);
+  */
 }

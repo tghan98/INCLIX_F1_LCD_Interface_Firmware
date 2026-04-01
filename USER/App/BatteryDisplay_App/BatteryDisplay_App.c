@@ -6,9 +6,10 @@
 
 #define BATTERYDISPLAY_LEVEL_INVALID  0xFFFFFFFFU
 #define BATTERYDISPLAY_TEXT_COLOR     0xFFFFU
-#define BATTERYDISPLAY_TEXT_X         24U
-#define BATTERYDISPLAY_MARK_X         80U
-#define BATTERYDISPLAY_LINE0_Y        18U
+/* Logical coordinates: (0,0) = top-left of visible area (ST7735S_LOGICAL_WIDTH x ST7735S_LOGICAL_HEIGHT) */
+#define BATTERYDISPLAY_TEXT_X         3U    /* was 24 (panel) - VIEW_X_MIN 21 = 3  */
+#define BATTERYDISPLAY_MARK_X         59U   /* was 80 (panel) - VIEW_X_MIN 21 = 59 */
+#define BATTERYDISPLAY_LINE0_Y        16U   /* was 18 (panel) - VIEW_Y_MIN  2 = 16 */
 #define BATTERYDISPLAY_LINE_STEP      7U
 
 /* Battery level text strings */
