@@ -1,4 +1,6 @@
-/* Battery display app - LCD text display for battery level */
+/**
+ * @brief 배터리 레벨을 LCD 텍스트로 표시하는 앱입니다.
+ */
 
 #include "BatteryDisplay_App.h"
 #include "BatteryMonitor_Interface.h"
@@ -6,22 +8,27 @@
 
 #define BATTERYDISPLAY_LEVEL_INVALID  0xFFFFFFFFU
 #define BATTERYDISPLAY_TEXT_COLOR     0xFFFFU
-/* Logical coordinates: (0,0) = top-left of visible area (ST7735S_LOGICAL_WIDTH x ST7735S_LOGICAL_HEIGHT) */
-#define BATTERYDISPLAY_TEXT_X         3U    /* was 24 (panel) - VIEW_X_MIN 21 = 3  */
-#define BATTERYDISPLAY_MARK_X         59U   /* was 80 (panel) - VIEW_X_MIN 21 = 59 */
-#define BATTERYDISPLAY_LINE0_Y        16U   /* was 18 (panel) - VIEW_Y_MIN  2 = 16 */
+/* 논리 좌표 기준입니다. (0,0)은 표시 영역의 왼쪽 위) */
+#define BATTERYDISPLAY_TEXT_X         3U    /* 기존 패널 좌표 24를 논리 좌표 3으로 보정 */
+#define BATTERYDISPLAY_MARK_X         59U   /* 기존 패널 좌표 80을 논리 좌표 59로 보정 */
+#define BATTERYDISPLAY_LINE0_Y        16U   /* 기존 패널 좌표 18을 논리 좌표 16으로 보정 */
 #define BATTERYDISPLAY_LINE_STEP      7U
 
-/* Battery level text strings */
+/* 배터리 단계별 표시 문자열 */
 static const char* battery_level_text[] = {
-  " BAT:CRIT 0/3",  /* Level 0 */
-  " BAT:LOW  1/3",  /* Level 1 */
-  " BAT:MED  2/3",  /* Level 2 */
-  " BAT:HIGH 3/3"   /* Level 3 */
+  "BAT:CRIT 0/3",  /* 0단계 */
+  "BAT:LOW  1/3",  /* 1단계 */
+  "BAT:MED  2/3",  /* 2단계 */
+  "BAT:HIGH 3/3"   /* 3단계 */
 };
 
 static uint32_t s_displayed_level = BATTERYDISPLAY_LEVEL_INVALID;
 
+/**
+ * @brief 현재 배터리 단계를 화면에 그립니다.
+ * @param level 표시할 배터리 단계값
+ * @retval 없음
+ */
 static void BatteryDisplay_App_RenderLevel(uint32_t level)
 {
   uint16_t line_y;
@@ -44,20 +51,30 @@ static void BatteryDisplay_App_RenderLevel(uint32_t level)
   ST7735S_Drv_DrawString3x5(BATTERYDISPLAY_MARK_X, line_y, ">", BATTERYDISPLAY_TEXT_COLOR, 0x0000U);
 }
 
+/**
+ * @brief 배터리 표시 앱을 초기화합니다.
+ * @param 없음
+ * @retval 없음
+ */
 void BatteryDisplay_App_Init(void)
 {
-  /* Initialize LCD display */
+  /* LCD를 초기화합니다. */
   ST7735S_Drv_Init();
   s_displayed_level = BATTERYDISPLAY_LEVEL_INVALID;
 }
 
+/**
+ * @brief 배터리 단계를 확인하고, 값이 바뀌면 화면을 다시 그립니다.
+ * @param 없음
+ * @retval 없음
+ */
 void BatteryDisplay_App_Run(void)
 {
   uint32_t current_level;
 
   current_level = BatteryMonitor_Interface_GetLevel();
 
-  /* Draw once at startup, then redraw only when the level changes. */
+  /* 처음 1회 출력하고, 이후에는 단계가 바뀔 때만 다시 그립니다. */
   if (current_level != s_displayed_level)
   {
     BatteryDisplay_App_RenderLevel(current_level);

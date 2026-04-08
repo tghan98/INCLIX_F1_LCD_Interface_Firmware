@@ -3,9 +3,13 @@
 #include "Button_Interface.h"
 #include "BatteryMonitor_Interface.h"
 #include "App/BatteryDisplay_App/BatteryDisplay_App.h"
+#include "User_HAL_Drv.h"
 
 int32_t User_Main_Init(void)
 {
+  /* 보드 의존 HAL 래퍼 초기화 */
+  (void)UserHAL_Config();
+
   /* 버튼 인터페이스 초기화 (버튼 인터페이스가 최우선) */
   Button_Interface_Init();
   

@@ -3,9 +3,9 @@
 
 #include "main.h"
 
-/* 기존 앱과 호환을 위해 유지한 프레임 크기입니다. (4bpp, 256x64) */
-#define ST7735S_DRV_WIDTH            256U
-#define ST7735S_DRV_HEIGHT           64U
+/* 드라이버 입력 프레임 크기입니다. (4bpp, 128x97) */
+#define ST7735S_DRV_WIDTH            128U
+#define ST7735S_DRV_HEIGHT           97U
 #define ST7735S_DRV_FRAME_BYTES      ((ST7735S_DRV_WIDTH * ST7735S_DRV_HEIGHT) / 2U)
 
 /* LCD 실제 패널 크기입니다. */
@@ -18,13 +18,13 @@
 #define ST7735S_VIEW_Y_MIN           2U
 #define ST7735S_VIEW_Y_MAX           95U
 
-/* 논리 좌표 크기입니다. (0,0)은 표시 영역의 왼쪽 위) */
+/* 논리 좌표 크기입니다. ((0,0)은 표시 영역의 왼쪽 위) */
 #define ST7735S_LOGICAL_WIDTH        ((ST7735S_VIEW_X_MAX) - (ST7735S_VIEW_X_MIN) + 1U)   /* 85 */
 #define ST7735S_LOGICAL_HEIGHT       ((ST7735S_VIEW_Y_MAX) - (ST7735S_VIEW_Y_MIN) + 1U)   /* 94 */
 
 /* LCD 초기화 */
 void ST7735S_Drv_Init(void);
-/* 4bpp 프레임 출력 */
+/* 4bpp 프레임 출력 (입력 버퍼 크기: ST7735S_DRV_FRAME_BYTES = 6272 bytes) */
 void ST7735S_Drv_WriteFrame(const uint8_t *frame);
 /* 화면 전체를 지정 색으로 채움 */
 void ST7735S_Drv_Clear(uint16_t rgb565);

@@ -352,6 +352,7 @@
                     <state>$PROJ_DIR$/../USER/Drive/ST7735S_Drv</state>
                     <state>$PROJ_DIR$/../USER/Drive/Button_Drv</state>
                     <state>$PROJ_DIR$/../USER/Drive/DAC_Manager</state>
+                    <state>$PROJ_DIR$/../USER/Drive/User_HAL</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -1133,6 +1134,9 @@
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\USER\Drive\DAC_Manager\DAC_Manager.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\USER\Drive\User_HAL\User_HAL_Drv.c</name>
                 </file>
             </group>
             <group>

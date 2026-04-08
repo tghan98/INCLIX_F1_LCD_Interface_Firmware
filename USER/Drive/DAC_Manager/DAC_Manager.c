@@ -2,10 +2,7 @@
 // 구조: IDDD_ADC_Manager 모방 (비블로킹 + 상태머신)
 
 #include "DAC_Manager.h"
-
-// main.c에서 생성된 HAL 핸들 가져오기
-extern DAC_HandleTypeDef hdac1;   // DAC1 핸들
-extern COMP_HandleTypeDef hcomp2;  // COMP2 핸들
+#include "User_HAL_Drv.h"
 
 //------------------------------------------------------------------------------
 // 내부 상태 변수
@@ -24,17 +21,27 @@ static uint8_t s_dac_manager_initialized = 0U;
   */
 void DAC_Manager_Init(void)
 {
+  DAC_HandleTypeDef *p_dac;
+  COMP_HandleTypeDef *p_comp;
+
   // 이미 초기화되었으면 중복 실행 방지
   if (s_dac_manager_initialized != 0U)
   {
     return;
   }
 
+  p_dac = (DAC_HandleTypeDef *)Read_DAC_HalDrive();
+  p_comp = (COMP_HandleTypeDef *)Read_COMP_HalDrive();
+  if ((p_dac == NULL) || (p_comp == NULL))
+  {
+    return;
+  }
+
   // DAC1 채널1 시작 (PA4에서 아날로그 출력)
-  HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
+  (void)HAL_DAC_Start(p_dac, DAC_CHANNEL_1);
 
   // COMP2 시작 (PA3 vs PA4 비교)
-  HAL_COMP_Start(&hcomp2);
+  (void)HAL_COMP_Start(p_comp);
 
   // 초기화 완료
   s_dac_manager_initialized = 1U;
@@ -72,7 +79,7 @@ int32_t DAC_Manager_Start_Set_RefValue(uint16_t dac_value)
   }
 
   // DAC 출력값 설정
-  if (HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, dac_value) != HAL_OK)
+  if (HW_DAC_CTRL((uint32_t)dac_value) != HAL_OK)
   {
     return DAC_MAN_SYSTEM_ERR;
   }
@@ -134,6 +141,7 @@ int32_t DAC_Manager_Check_Ready(void)
   */
 int32_t DAC_Manager_Get_CompareResult(uint8_t *p_is_higher)
 {
+  COMP_HandleTypeDef *p_comp;
   uint32_t comp_level;
 
   // 안전성 검사
@@ -148,8 +156,14 @@ int32_t DAC_Manager_Get_CompareResult(uint8_t *p_is_higher)
     return DAC_MAN_SYSTEM_ERR;
   }
 
+  p_comp = (COMP_HandleTypeDef *)Read_COMP_HalDrive();
+  if (p_comp == NULL)
+  {
+    return DAC_MAN_SYSTEM_ERR;
+  }
+
   // COMP2 출력 레벨 읽기
-  comp_level = HAL_COMP_GetOutputLevel(&hcomp2);
+  comp_level = HAL_COMP_GetOutputLevel(p_comp);
 
   if (comp_level == COMP_OUTPUT_LEVEL_HIGH)
   {

@@ -1,4 +1,5 @@
 #include "ST7735S_Drv.h"
+#include "User_HAL_Drv.h"
 #include "string.h"
 
 #define ST7735S_PANEL_WIDTH           128U
@@ -6,15 +7,22 @@
 #define ST7735S_RAM_OFFSET_X          0U
 #define ST7735S_RAM_OFFSET_Y          32U
 #define ST7735S_FRAME_OFFSET_X        0U
-#define ST7735S_FRAME_OFFSET_Y        17U
+#define ST7735S_FRAME_OFFSET_Y        0U
 #define ST7735S_MADCTL_DEFAULT        0x08U
 #define ST7735S_COLMOD_RGB565         0x05U
 #define ST7735S_TUNING_PATTERN_MODE   0U
 #define LCD_BL_ACTIVE_HIGH            1U
 #define LCD_BL_DEFAULT_PERCENT        90U
 
-extern SPI_HandleTypeDef hspi2;
-extern TIM_HandleTypeDef htim14;
+static SPI_HandleTypeDef *lcd_get_spi_handle(void)
+{
+  return (SPI_HandleTypeDef *)Read_LCD_SPI_HalDrive();
+}
+
+static TIM_HandleTypeDef *lcd_get_bl_timer_handle(void)
+{
+  return (TIM_HandleTypeDef *)Read_LCD_BL_Timer_HalDrive();
+}
 
 /**
  * @brief  LCD CS 핀을 제어합니다. (Active-Low)
@@ -23,18 +31,7 @@ extern TIM_HandleTypeDef htim14;
  */
 static void lcd_select(uint8_t selected)
 {
-  GPIO_PinState cs_state;
-
-  if (selected != 0U)
-  {
-    cs_state = GPIO_PIN_RESET;
-  }
-  else
-  {
-    cs_state = GPIO_PIN_SET;
-  }
-
-  HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, cs_state);
+  HW_LCD_CS_Select((uint32_t)selected);
 }
 
 /**
@@ -44,9 +41,9 @@ static void lcd_select(uint8_t selected)
  */
 static void lcd_write_cmd(uint8_t cmd)
 {
-  HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_RESET);
+  HW_LCD_DC_Set(0U);
   lcd_select(1U);
-  (void)HAL_SPI_Transmit(&hspi2, &cmd, 1U, HAL_MAX_DELAY);
+  (void)HAL_SPI_Transmit(lcd_get_spi_handle(), &cmd, 1U, HAL_MAX_DELAY);
   lcd_select(0U);
 }
 
@@ -58,9 +55,9 @@ static void lcd_write_cmd(uint8_t cmd)
  */
 static void lcd_write_data(const uint8_t *data, uint16_t len)
 {
-  HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_SET);
+  HW_LCD_DC_Set(1U);
   lcd_select(1U);
-  (void)HAL_SPI_Transmit(&hspi2, (uint8_t *)data, len, HAL_MAX_DELAY);
+  (void)HAL_SPI_Transmit(lcd_get_spi_handle(), (uint8_t *)data, len, HAL_MAX_DELAY);
   lcd_select(0U);
 }
 
@@ -81,6 +78,7 @@ static void lcd_write_data8(uint8_t data)
  */
 static void lcd_backlight_set_percent(uint8_t percent)
 {
+  TIM_HandleTypeDef *p_htim;
   uint32_t pulse;
   uint32_t period;
 
@@ -89,7 +87,13 @@ static void lcd_backlight_set_percent(uint8_t percent)
     percent = 100U;
   }
 
-  period = __HAL_TIM_GET_AUTORELOAD(&htim14);
+  p_htim = lcd_get_bl_timer_handle();
+  if (p_htim == NULL)
+  {
+    return;
+  }
+
+  period = __HAL_TIM_GET_AUTORELOAD(p_htim);
   pulse = ((period + 1U) * percent) / 100U;
   if (pulse > period)
   {
@@ -97,9 +101,9 @@ static void lcd_backlight_set_percent(uint8_t percent)
   }
 
 #if (LCD_BL_ACTIVE_HIGH != 0U)
-  __HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, pulse);
+  __HAL_TIM_SET_COMPARE(p_htim, TIM_CHANNEL_1, pulse);
 #else
-  __HAL_TIM_SET_COMPARE(&htim14, TIM_CHANNEL_1, period - pulse);
+  __HAL_TIM_SET_COMPARE(p_htim, TIM_CHANNEL_1, period - pulse);
 #endif
 }
 
@@ -110,7 +114,15 @@ static void lcd_backlight_set_percent(uint8_t percent)
  */
 static void lcd_backlight_init(void)
 {
-  (void)HAL_TIM_PWM_Start(&htim14, TIM_CHANNEL_1);
+  TIM_HandleTypeDef *p_htim;
+
+  p_htim = lcd_get_bl_timer_handle();
+  if (p_htim == NULL)
+  {
+    return;
+  }
+
+  (void)HAL_TIM_PWM_Start(p_htim, TIM_CHANNEL_1);
   lcd_backlight_set_percent(LCD_BL_DEFAULT_PERCENT);
 }
 
@@ -137,9 +149,9 @@ static void lcd_write_cmd_with_data(uint8_t cmd, const uint8_t *data, uint16_t l
  */
 static void lcd_hard_reset(void)
 {
-  HAL_GPIO_WritePin(LCD_RST_GPIO_Port, LCD_RST_Pin, GPIO_PIN_RESET);
+  HW_LCD_Reset(0U);
   HAL_Delay(10U);
-  HAL_GPIO_WritePin(LCD_RST_GPIO_Port, LCD_RST_Pin, GPIO_PIN_SET);
+  HW_LCD_Reset(1U);
   HAL_Delay(120U);
 }
 
@@ -187,11 +199,11 @@ static void st7735s_clear_black(void)
                      (uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_PANEL_WIDTH - 1U),
                      (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_PANEL_HEIGHT - 1U));
   lcd_write_cmd(0x2CU); /* RAMWR */
-  HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_SET);
+  HW_LCD_DC_Set(1U);
   lcd_select(1U);
   for (y = 0U; y < ST7735S_PANEL_HEIGHT; y++)
   {
-    (void)HAL_SPI_Transmit(&hspi2, line, (uint16_t)sizeof(line), HAL_MAX_DELAY);
+    (void)HAL_SPI_Transmit(lcd_get_spi_handle(), line, (uint16_t)sizeof(line), HAL_MAX_DELAY);
   }
   lcd_select(0U);
 }
@@ -234,7 +246,7 @@ static void st7735s_draw_tuning_pattern(void)
                      (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_PANEL_HEIGHT - 1U));
   lcd_write_cmd(0x2CU); /* RAMWR */
 
-  HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_SET);
+  HW_LCD_DC_Set(1U);
   lcd_select(1U);
 
   /* Phase-1 debug: force full solid color only. */
@@ -247,7 +259,7 @@ static void st7735s_draw_tuning_pattern(void)
 
   for (y = 0U; y < ST7735S_PANEL_HEIGHT; y++)
   {
-    (void)HAL_SPI_Transmit(&hspi2, tx_line, (uint16_t)sizeof(tx_line), HAL_MAX_DELAY);
+    (void)HAL_SPI_Transmit(lcd_get_spi_handle(), tx_line, (uint16_t)sizeof(tx_line), HAL_MAX_DELAY);
   }
 
   lcd_select(0U);
@@ -271,6 +283,7 @@ void ST7735S_Drv_Init(void)
   static const uint8_t pwctr5[] = {0x8AU, 0xEEU};
   static const uint8_t vmctr1[] = {0x0EU};
 
+  HW_LCD_Power_ONnOFF(1U);
   lcd_backlight_init();
   HAL_Delay(20U);
 
@@ -314,7 +327,7 @@ void ST7735S_Drv_Init(void)
 }
 
 /**
- * @brief  4bpp 프레임을 LCD로 출력합니다. (256x64 -> 128x64 downsample)
+ * @brief  4bpp 프레임(128x97)을 LCD로 출력합니다.
  * @param  frame 프레임 버퍼 포인터
  * @retval 없음
  */
@@ -347,38 +360,40 @@ void ST7735S_Drv_WriteFrame(const uint8_t *frame)
                      (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_FRAME_OFFSET_Y + ST7735S_DRV_HEIGHT - 1U));
   lcd_write_cmd(0x2CU); /* RAMWR */
 
-  HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_SET);
+  HW_LCD_DC_Set(1U);
   lcd_select(1U);
   for (y = 0U; y < ST7735S_DRV_HEIGHT; y++)
   {
     const uint8_t *src_line;
-    uint32_t src_idx;
+    uint32_t src_x;
     uint32_t dst_idx;
 
     src_line = &frame[y * (ST7735S_DRV_WIDTH / 2U)];
-    src_idx = 0U;
+    src_x = 0U;
     dst_idx = 0U;
 
-    for (x = 0U; x < ST7735S_PANEL_WIDTH; x++)
+    for (x = 0U; x < (ST7735S_DRV_WIDTH / 2U); x++)
     {
       uint8_t packed;
       uint8_t gray_left;
       uint8_t gray_right;
-      uint8_t gray_mid;
-      uint16_t px;
+      uint16_t px_left;
+      uint16_t px_right;
 
-      packed = src_line[src_idx++];
+      packed = src_line[src_x++];
       gray_left = (uint8_t)((packed >> 4) & 0x0FU);
       gray_right = (uint8_t)(packed & 0x0FU);
-      gray_mid = (uint8_t)((gray_left + gray_right) >> 1);
+      px_left = gray_lut_565[gray_left];
+      px_right = gray_lut_565[gray_right];
 
-      px = gray_lut_565[gray_mid];
+      tx_line[dst_idx++] = (uint8_t)(px_left >> 8);
+      tx_line[dst_idx++] = (uint8_t)(px_left & 0xFFU);
 
-      tx_line[dst_idx++] = (uint8_t)(px >> 8);
-      tx_line[dst_idx++] = (uint8_t)(px & 0xFFU);
+      tx_line[dst_idx++] = (uint8_t)(px_right >> 8);
+      tx_line[dst_idx++] = (uint8_t)(px_right & 0xFFU);
     }
 
-    (void)HAL_SPI_Transmit(&hspi2, tx_line, (uint16_t)sizeof(tx_line), HAL_MAX_DELAY);
+    (void)HAL_SPI_Transmit(lcd_get_spi_handle(), tx_line, (uint16_t)sizeof(tx_line), HAL_MAX_DELAY);
   }
   lcd_select(0U);
 #endif
@@ -395,18 +410,20 @@ static void st7735s_draw_pixel(uint16_t x, uint16_t y, uint16_t rgb565)
 {
   uint8_t px[2];
 
-  /* Clip to logical coordinate bounds: (0,0) = top-left of visible area */
+  /* 논리 좌표 기준 유효 표시 영역을 벗어나면 그리지 않습니다. */
   if ((x >= (uint16_t)ST7735S_LOGICAL_WIDTH) || (y >= (uint16_t)ST7735S_LOGICAL_HEIGHT))
   {
     return;
   }
 
+  /* 논리 좌표(x,y)를 LCD 컨트롤러의 실제 RAM 좌표로 변환합니다. */
   st7735s_set_window((uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_VIEW_X_MIN + x),
                      (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_VIEW_Y_MIN + y),
                      (uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_VIEW_X_MIN + x),
                      (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_VIEW_Y_MIN + y));
   lcd_write_cmd(0x2CU); /* RAMWR */
 
+  /* RGB565 16비트 색상을 상위/하위 바이트로 나눠 1픽셀 데이터를 전송합니다. */
   px[0] = (uint8_t)(rgb565 >> 8);
   px[1] = (uint8_t)(rgb565 & 0xFFU);
   lcd_write_data(px, 2U);
@@ -518,7 +535,7 @@ void ST7735S_Drv_DrawChar3x5(uint16_t x, uint16_t y, char ch, uint16_t fg_rgb565
   uint16_t col;
   uint16_t px;
 
-  /* Full out-of-bounds: nothing to draw */
+  /* 문자 시작 좌표가 논리 표시 영역 밖이면 출력하지 않습니다. */
   if ((x >= (uint16_t)ST7735S_LOGICAL_WIDTH) || (y >= (uint16_t)ST7735S_LOGICAL_HEIGHT))
   {
     return;
@@ -526,9 +543,9 @@ void ST7735S_Drv_DrawChar3x5(uint16_t x, uint16_t y, char ch, uint16_t fg_rgb565
 
   glyph = st7735s_get_glyph_3x5(ch);
 
-  /* Optimized path: entire 4x5 cell fits within logical bounds.
-   * Build pixel buffer in CPU, then send in one set_window + bulk SPI transfer.
-   * SPI transactions: 4 (vs 80 per-pixel). */
+  /* 4x5 문자 셀이 논리 표시 영역 안에 전부 들어오면,
+   * CPU에서 셀 버퍼를 먼저 만든 뒤 한 번의 window 설정과 일괄 전송으로 처리합니다.
+   * SPI 트랜잭션 수를 픽셀 단위 방식 대비 크게 줄일 수 있습니다. */
   if ((x <= (uint16_t)(ST7735S_LOGICAL_WIDTH - 4U)) &&
       (y <= (uint16_t)(ST7735S_LOGICAL_HEIGHT - 5U)))
   {
@@ -557,7 +574,7 @@ void ST7735S_Drv_DrawChar3x5(uint16_t x, uint16_t y, char ch, uint16_t fg_rgb565
   }
   else
   {
-    /* Partial clip fallback: per-pixel rendering with individual clipping */
+    /* 문자 일부가 경계에 걸치면 픽셀 단위로 개별 클리핑하며 출력합니다. */
     for (row = 0U; row < 5U; row++)
     {
       for (col = 0U; col < 4U; col++)
@@ -622,20 +639,17 @@ void ST7735S_Drv_Clear(uint16_t rgb565)
                      (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_PANEL_HEIGHT - 1U));
   lcd_write_cmd(0x2CU); /* RAMWR */
 
-  HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_SET);
+  HW_LCD_DC_Set(1U);
   lcd_select(1U);
   for (y = 0U; y < ST7735S_PANEL_HEIGHT; y++)
   {
-    (void)HAL_SPI_Transmit(&hspi2, line, (uint16_t)sizeof(line), HAL_MAX_DELAY);
+    (void)HAL_SPI_Transmit(lcd_get_spi_handle(), line, (uint16_t)sizeof(line), HAL_MAX_DELAY);
   }
   lcd_select(0U);
 
-  /* Permanent marker: final outer corners of visible area. */
   /* 임시 테스트: 4점 마커 주석처리 - 아래쪽 불규칙한 선 원인 파악용 */
-  /*
   st7735s_draw_pixel(0U, 0U, 0xFFFFU);
   st7735s_draw_pixel((uint16_t)(ST7735S_LOGICAL_WIDTH - 1U), 0U, 0xFFFFU);
   st7735s_draw_pixel(0U, (uint16_t)(ST7735S_LOGICAL_HEIGHT - 1U), 0xFFFFU);
   st7735s_draw_pixel((uint16_t)(ST7735S_LOGICAL_WIDTH - 1U), (uint16_t)(ST7735S_LOGICAL_HEIGHT - 1U), 0xFFFFU);
-  */
 }
