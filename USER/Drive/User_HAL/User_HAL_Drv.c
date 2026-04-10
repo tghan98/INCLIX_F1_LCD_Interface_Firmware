@@ -2,7 +2,6 @@
   ******************************************************************************
   * @file           : User_HAL_Drv.c
   * @brief          : INCLIX 보드 하드웨어 제어용 HAL 래퍼 드라이버
-  ******************************************************************************
   * @details
   * 보드 의존 GPIO/HAL 제어를 이 파일에 모아 상위 로직과 하드웨어를 분리한다.
   * 전원, LCD, DAC, 공통 HAL 핸들 접근을 한 곳에서 관리한다.
@@ -13,10 +12,12 @@
 #include "User_HAL_Drv.h"
 
 /* Private define ------------------------------------------------------------*/
+/* 보드의 전원 상태 표시 LED는 PC13을 사용한다. */
 #define POWER_STATUS_LED_GPIO_Port   GPIOC
 #define POWER_STATUS_LED_Pin         GPIO_PIN_13
 
 /* Extern --------------------------------------------------------------------*/
+/* `main.c`에서 생성된 HAL 핸들을 이 파일에서 참조한다. */
 extern DAC_HandleTypeDef hdac1;
 extern SPI_HandleTypeDef hspi2;
 extern TIM_HandleTypeDef htim14;
@@ -63,6 +64,7 @@ uint32_t BSP_TickTimer(uint32_t *p_tick_timer, uint32_t wait_tick_time)
 {
   uint32_t current_tick;
 
+  /* 잘못된 포인터가 들어오면 더 이상 진행하지 않는다. */
   if (p_tick_timer == NULL)
   {
     return RESET;
@@ -70,16 +72,19 @@ uint32_t BSP_TickTimer(uint32_t *p_tick_timer, uint32_t wait_tick_time)
 
   current_tick = HAL_GetTick();
 
+  /* 첫 진입 시 현재 tick을 저장해 타이머 시작점으로 사용한다. */
   if (*p_tick_timer == 0U)
   {
     *p_tick_timer = current_tick;
   }
+  /* 지정한 시간이 지나면 타이머를 초기화하고 완료를 알린다. */
   else if ((current_tick - *p_tick_timer) >= wait_tick_time)
   {
     *p_tick_timer = 0U;
     return RESET;
   }
 
+  /* 아직 대기 시간이 남아 있으면 진행 중 상태를 유지한다. */
   return SET;
 }
 
@@ -90,6 +95,7 @@ uint32_t BSP_TickTimer(uint32_t *p_tick_timer, uint32_t wait_tick_time)
   */
 void HW_PW_OnOff(uint32_t on_off)
 {
+  /* 상위 로직은 0/1 의미값만 넘기고, 실제 핀 상태 변환은 내부에서 처리한다. */
   HAL_GPIO_WritePin(MPW_ONOFF_GPIO_Port, MPW_ONOFF_Pin, UserHAL_ToPinState(on_off));
 }
 
@@ -181,6 +187,7 @@ void HW_LCD_Reset(uint32_t on_off)
   */
 void HW_LCD_CS_Select(uint32_t select)
 {
+  /* LCD CS는 active-low 이므로, 선택 시 Low / 해제 시 High를 출력한다. */
   if (select != 0U)
   {
     HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, GPIO_PIN_RESET);
@@ -208,6 +215,7 @@ void HW_LCD_DC_Set(uint32_t is_data)
   */
 int32_t HW_DAC_CTRL(uint32_t dac_12b_count)
 {
+  /* DAC1 채널 1의 기준 전압 값을 설정하고 HAL 결과값을 그대로 반환한다. */
   return (int32_t)HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, dac_12b_count);
 }
 
@@ -217,6 +225,7 @@ int32_t HW_DAC_CTRL(uint32_t dac_12b_count)
   */
 void *Read_LCD_SPI_HalDrive(void)
 {
+  /* ST7735S 드라이버가 직접 extern을 알지 않도록 접근 창구 역할을 한다. */
   return (void *)&hspi2;
 }
 

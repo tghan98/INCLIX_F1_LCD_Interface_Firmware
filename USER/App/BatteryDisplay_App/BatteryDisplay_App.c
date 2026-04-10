@@ -34,14 +34,14 @@ static void BatteryDisplay_App_RenderLevel(uint32_t level)
   uint16_t line_y;
   uint32_t line_index;
 
-  if (level >= 4U)
+  if (level > BATTERY_LEVEL_HIGH)
   {
     return;
   }
 
   ST7735S_Drv_Clear(0x0000U);
 
-  for (line_index = 0U; line_index < 4U; line_index++)
+  for (line_index = 0U; line_index <= BATTERY_LEVEL_HIGH; line_index++)
   {
     line_y = (uint16_t)(BATTERYDISPLAY_LINE0_Y + (line_index * BATTERYDISPLAY_LINE_STEP));
     ST7735S_Drv_DrawString3x5(BATTERYDISPLAY_TEXT_X, line_y, battery_level_text[line_index], BATTERYDISPLAY_TEXT_COLOR, 0x0000U);
@@ -64,21 +64,30 @@ void BatteryDisplay_App_Init(void)
 }
 
 /**
- * @brief 배터리 단계를 확인하고, 값이 바뀌면 화면을 다시 그립니다.
+ * @brief 배터리 이벤트를 소비하여 최신 레벨 기준으로 화면을 갱신합니다.
  * @param 없음
  * @retval 없음
  */
 void BatteryDisplay_App_Run(void)
 {
-  uint32_t current_level;
+  BatteryMonitor_AppEvent_t event;
+  uint32_t latest_level = BATTERYDISPLAY_LEVEL_INVALID;
+  uint8_t has_pending_event = 0U;
 
-  current_level = BatteryMonitor_Interface_GetLevel();
-
-  /* 처음 1회 출력하고, 이후에는 단계가 바뀔 때만 다시 그립니다. */
-  if (current_level != s_displayed_level)
+  while (BatteryMonitor_Interface_GetEvent(&event) == 0)
   {
-    BatteryDisplay_App_RenderLevel(current_level);
-    s_displayed_level = current_level;
+    if (event.level <= BATTERY_LEVEL_HIGH)
+    {
+      latest_level = event.level;
+      has_pending_event = 1U;
+    }
+  }
+
+  /* 누적된 이벤트는 모두 소비하되, 마지막 유효 레벨만 화면에 반영합니다. */
+  if ((has_pending_event != 0U) && (latest_level != s_displayed_level))
+  {
+    BatteryDisplay_App_RenderLevel(latest_level);
+    s_displayed_level = latest_level;
   }
 }
 

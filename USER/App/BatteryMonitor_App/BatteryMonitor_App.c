@@ -11,6 +11,7 @@ static uint32_t s_queue_count = 0U;   // 큐에 저장된 이벤트 개수
 
 // 현재 배터리 레벨 (0~3)
 static uint32_t s_current_level = BATTERY_LEVEL_HIGH;
+static uint8_t s_is_initial_level_reported = 0U;
 
 typedef enum
 {
@@ -32,7 +33,11 @@ static uint32_t s_stage_start_tick = 0U;
 static void BatteryMonitor_App_Que_Init(void);
 static int32_t BatteryMonitor_App_Que_Push(uint32_t level);
 
-/* 이벤트 큐 초기화 */
+/**
+ * @brief 배터리 이벤트 큐를 초기화합니다.
+ * @details 큐 인덱스와 저장 개수를 초기 상태로 되돌리고,
+ *          내부 이벤트 버퍼를 모두 0으로 클리어합니다.
+ */
 static void BatteryMonitor_App_Que_Init(void)
 {
   s_queue_head = 0U;
@@ -41,7 +46,12 @@ static void BatteryMonitor_App_Que_Init(void)
   memset(s_event_queue, 0, sizeof(s_event_queue));
 }
 
-/* 이벤트 큐에 배터리 레벨 추가 */
+/**
+ * @brief 배터리 레벨 이벤트를 큐에 저장합니다.
+ * @param[in] level 저장할 배터리 레벨 값입니다.
+ * @retval 0   큐 저장 성공
+ * @retval -1  큐가 가득 차서 저장 실패
+ */
 static int32_t BatteryMonitor_App_Que_Push(uint32_t level)
 {
   if (s_queue_count >= BATTERYMONITOR_APP_EVENT_QUEUE_SIZE)
@@ -56,7 +66,11 @@ static int32_t BatteryMonitor_App_Que_Push(uint32_t level)
   return 0;
 }
 
-/* 배터리 모니터 초기화 */
+/**
+ * @brief 배터리 모니터 애플리케이션을 초기화합니다.
+ * @details 이벤트 큐와 DAC 매니저를 초기화하고,
+ *          배터리 스캔 상태 머신의 시작 상태를 설정합니다.
+ */
 void BatteryMonitor_App_Init(void)
 {
   BatteryMonitor_App_Que_Init();  // 이벤트 큐 초기화
@@ -66,6 +80,7 @@ void BatteryMonitor_App_Init(void)
 
   // 초기값: 배터리 완충 상태로 가정
   s_current_level = BATTERY_LEVEL_HIGH;
+  s_is_initial_level_reported = 0U;
 
   s_scan_state = BAT_SCAN_STATE_INIT;
   s_scan_stage = 0U;
@@ -76,7 +91,11 @@ void BatteryMonitor_App_Init(void)
   s_stage_start_tick = s_last_cycle_tick;
 }
 
-/* 배터리 레벨 감지 및 이벤트 생성 (메인 루프에서 호출) */
+/**
+ * @brief 배터리 전압을 단계적으로 스캔하고 레벨 변화를 처리합니다.
+ * @details 메인 루프에서 주기적으로 호출되며, 비차단 상태 머신 방식으로
+ *          DAC 기준 전압 설정, 비교기 결과 판독, 이벤트 생성까지 수행합니다.
+ */
 void BatteryMonitor_App_Task(void)
 {
   uint32_t current_tick = HAL_GetTick();
@@ -199,11 +218,15 @@ void BatteryMonitor_App_Task(void)
         new_level = BATTERY_LEVEL_HIGH;
       }
 
-      if (new_level != s_current_level)
+      if ((s_is_initial_level_reported == 0U) || (new_level != s_current_level))
       {
-        s_current_level = new_level;
-        BatteryMonitor_App_Que_Push(new_level);
+        if (BatteryMonitor_App_Que_Push(new_level) == 0)
+        {
+          s_is_initial_level_reported = 1U;
+        }
       }
+
+      s_current_level = new_level;
 
       // 다음 사이클을 위해 초기화
       s_scan_stage = 0U;
@@ -217,13 +240,13 @@ void BatteryMonitor_App_Task(void)
   }
 }
 
-/* 현재 배터리 레벨 반환 (0~3) */
-uint32_t BatteryMonitor_App_GetLevel(void)
-{
-  return s_current_level;
-}
-
-/* 이벤트 큐에서 배터리 이벤트 꺼내기 (구독 패턴) */
+/**
+ * @brief 대기 중인 배터리 이벤트 1건을 큐에서 꺼냅니다.
+ * @param[out] event 읽어온 이벤트를 저장할 포인터입니다.
+ * @return int32_t
+ * @retval 0   이벤트 읽기 성공
+ * @retval -1  큐가 비어 있어 읽기 실패
+ */
 int32_t BatteryMonitor_App_GetEvent(BatteryMonitor_AppEvent_t* event)
 {
   if (s_queue_count == 0U)
@@ -238,7 +261,10 @@ int32_t BatteryMonitor_App_GetEvent(BatteryMonitor_AppEvent_t* event)
   return 0;  // 성공
 }
 
-/* 대기 중인 이벤트 개수 반환 */
+/**
+ * @brief 현재 큐에 대기 중인 배터리 이벤트 개수를 반환합니다.
+ * @return uint32_t 대기 중인 이벤트 수입니다.
+ */
 uint32_t BatteryMonitor_App_GetEventCount(void)
 {
   return s_queue_count;

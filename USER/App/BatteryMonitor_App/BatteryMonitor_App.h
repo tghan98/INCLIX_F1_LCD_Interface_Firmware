@@ -28,7 +28,6 @@ typedef struct {
 
 void BatteryMonitor_App_Init(void);
 void BatteryMonitor_App_Task(void);
-uint32_t BatteryMonitor_App_GetLevel(void);
 int32_t BatteryMonitor_App_GetEvent(BatteryMonitor_AppEvent_t* event);
 uint32_t BatteryMonitor_App_GetEventCount(void);
 

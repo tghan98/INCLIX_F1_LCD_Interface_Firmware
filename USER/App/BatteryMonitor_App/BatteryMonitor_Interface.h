@@ -8,7 +8,6 @@
 
 void BatteryMonitor_Interface_Init(void);
 void BatteryMonitor_Interface_Run(void);
-uint32_t BatteryMonitor_Interface_GetLevel(void);
 int32_t BatteryMonitor_Interface_GetEvent(BatteryMonitor_AppEvent_t* event);
 uint32_t BatteryMonitor_Interface_GetEventCount(void);
 

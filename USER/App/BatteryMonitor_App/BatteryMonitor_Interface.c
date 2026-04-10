@@ -12,11 +12,6 @@ void BatteryMonitor_Interface_Run(void)
   BatteryMonitor_App_Task();
 }
 
-uint32_t BatteryMonitor_Interface_GetLevel(void)
-{
-  return BatteryMonitor_App_GetLevel();
-}
-
 int32_t BatteryMonitor_Interface_GetEvent(BatteryMonitor_AppEvent_t* event)
 {
   return BatteryMonitor_App_GetEvent(event);
