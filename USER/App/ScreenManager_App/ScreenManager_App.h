@@ -1,0 +1,29 @@
+/* Screen manager app (internal logic) */
+
+#ifndef SCREENMANAGER_APP_H
+#define SCREENMANAGER_APP_H
+
+#include "main.h"
+
+typedef enum
+{
+  SCREENMANAGER_STATE_BOOT = 0,
+  SCREENMANAGER_STATE_IDLE,
+  SCREENMANAGER_STATE_POWER_OFF_HINT
+} ScreenManager_State_t;
+
+typedef enum
+{
+  SCREENMANAGER_CMD_NONE = 0,
+  SCREENMANAGER_CMD_SHOW_IDLE,
+  SCREENMANAGER_CMD_SHOW_POWER_OFF_HINT
+} ScreenManager_Command_t;
+
+int32_t ScreenManager_App_Init(void);
+int32_t ScreenManager_App_Run(void);
+int32_t ScreenManager_App_SubmitCommand(ScreenManager_Command_t cmd);
+ScreenManager_State_t ScreenManager_App_GetState(void);
+
+#endif /* SCREENMANAGER_APP_H */
+
+/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

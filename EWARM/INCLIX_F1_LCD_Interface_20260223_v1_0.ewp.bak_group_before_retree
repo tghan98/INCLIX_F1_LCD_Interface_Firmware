@@ -1127,9 +1127,9 @@
       </file>
     </group>
     <group>
-      <name>Core</name>
+      <name>User</name>
       <group>
-        <name>Src</name>
+        <name>Core</name>
         <file>
           <name>$PROJ_DIR$\..\Core\Src\main.c</name>
         </file>
@@ -1184,142 +1184,103 @@
             <name>$PROJ_DIR$\..\USER\App\PowerManager_App\PowerManager_Interface.c</name>
           </file>
         </group>
-        <group>
-          <name>InputInterpreter_App</name>
-          <file>
-            <name>$PROJ_DIR$\..\USER\App\InputInterpreter_App\InputInterpreter_App.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\USER\App\InputInterpreter_App\InputInterpreter_Interface.c</name>
-          </file>
-        </group>
-        <group>
-          <name>ScreenManager_App</name>
-          <file>
-            <name>$PROJ_DIR$\..\USER\App\ScreenManager_App\ScreenManager_App.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\USER\App\ScreenManager_App\ScreenManager_Interface.c</name>
-          </file>
-        </group>
       </group>
       <group>
         <name>Drive</name>
-        <group>
-          <name>PowerControl_Drv</name>
-          <file>
-            <name>$PROJ_DIR$\..\USER\Drive\PowerControl_Drv\PowerControl_Drv.c</name>
-          </file>
-        </group>
-        <group>
-          <name>ST7735S_Drv</name>
-          <file>
-            <name>$PROJ_DIR$\..\USER\Drive\ST7735S_Drv\ST7735S_Drv.c</name>
-          </file>
-        </group>
-        <group>
-          <name>Button_Drv</name>
-          <file>
-            <name>$PROJ_DIR$\..\USER\Drive\Button_Drv\Button_Drv.c</name>
-          </file>
-        </group>
-        <group>
-          <name>DAC_Manager</name>
-          <file>
-            <name>$PROJ_DIR$\..\USER\Drive\DAC_Manager\DAC_Manager.c</name>
-          </file>
-        </group>
-        <group>
-          <name>User_HAL</name>
-          <file>
-            <name>$PROJ_DIR$\..\USER\Drive\User_HAL\User_HAL_Drv.c</name>
-          </file>
-        </group>
+        <file>
+          <name>$PROJ_DIR$\..\USER\Drive\PowerControl_Drv\PowerControl_Drv.c</name>
+        </file>
+        <file>
+          <name>$PROJ_DIR$\..\USER\Drive\ST7735S_Drv\ST7735S_Drv.c</name>
+        </file>
+        <file>
+          <name>$PROJ_DIR$\..\USER\Drive\Button_Drv\Button_Drv.c</name>
+        </file>
+        <file>
+          <name>$PROJ_DIR$\..\USER\Drive\DAC_Manager\DAC_Manager.c</name>
+        </file>
+        <file>
+          <name>$PROJ_DIR$\..\USER\Drive\User_HAL\User_HAL_Drv.c</name>
+        </file>
       </group>
-      <file>
-        <name>$PROJ_DIR$\..\USER\User_Main.c</name>
-      </file>
+      <group>
+        <name>UserMain</name>
+        <file>
+          <name>$PROJ_DIR$\..\USER\User_Main.c</name>
+        </file>
+      </group>
     </group>
   </group>
   <group>
     <name>Drivers</name>
     <group>
-      <name>Core</name>
-      <group>
-        <name>Src</name>
-        <file>
-          <name>$PROJ_DIR$\..\Core\Src\system_stm32g0xx.c</name>
-        </file>
-      </group>
+      <name>CMSIS</name>
+      <file>
+        <name>$PROJ_DIR$\..\Core\Src\system_stm32g0xx.c</name>
+      </file>
     </group>
     <group>
-      <name>Drivers</name>
-      <group>
-        <name>STM32G0xx_HAL_Driver</name>
-        <group>
-          <name>Src</name>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_cortex.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dma.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dma_ex.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_exti.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_flash.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_flash_ex.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_gpio.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_pwr.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_pwr_ex.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_rcc.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_rcc_ex.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_spi.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_spi_ex.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_comp.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dac.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dac_ex.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_tim.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_tim_ex.c</name>
-          </file>
-          <file>
-            <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_ll_rcc.c</name>
-          </file>
-        </group>
-      </group>
+      <name>STM32G0xx_HAL_Driver</name>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_cortex.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dma.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dma_ex.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_exti.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_flash.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_flash_ex.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_gpio.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_pwr.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_pwr_ex.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_rcc.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_rcc_ex.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_spi.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_spi_ex.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_comp.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dac.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_dac_ex.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_tim.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_hal_tim_ex.c</name>
+      </file>
+      <file>
+        <name>$PROJ_DIR$\..\Drivers\STM32G0xx_HAL_Driver\Src\stm32g0xx_ll_rcc.c</name>
+      </file>
     </group>
   </group>
 </project>
