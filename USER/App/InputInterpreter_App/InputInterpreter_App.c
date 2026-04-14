@@ -8,10 +8,12 @@
 
 #include "BatteryMonitor_App.h"
 #include "Button_Drv.h"
+#include "PowerControl_Drv.h"
 
 #include <string.h>
 
 static InputInterpreter_TranslatedCmd_t s_last_translated_cmd;
+static GPIO_PinState s_prev_vbus_state;
 
 static void InputInterpreter_ResetLastTranslated(void);
 static int32_t InputInterpreter_DispatchToPower(const InputInterpreter_TranslatedCmd_t* cmd);
@@ -21,6 +23,7 @@ static void InputInterpreter_TranslateButtonEvent(const ButtonAppEvent_t* event)
 static void InputInterpreter_TranslateBatteryEvent(const BatteryMonitor_AppEvent_t* event);
 static void InputInterpreter_PollButtonEvents(void);
 static void InputInterpreter_PollBatteryEvents(void);
+static void InputInterpreter_PollVbusEvents(void);
 
 /**
  * @brief 마지막 변환 명령 정보를 초기값으로 리셋한다.
@@ -58,6 +61,14 @@ static int32_t InputInterpreter_DispatchToPower(const InputInterpreter_Translate
 
     case INPUTINTERPRETER_CMD_POWER_BATTERY_CRITICAL:
       power_cmd = POWERMANAGER_CMD_BATTERY_CRITICAL;
+      break;
+
+    case INPUTINTERPRETER_CMD_CHARGER_ATTACHED:
+      power_cmd = POWERMANAGER_CMD_CHARGER_ATTACHED;
+      break;
+
+    case INPUTINTERPRETER_CMD_CHARGER_DETACHED:
+      power_cmd = POWERMANAGER_CMD_CHARGER_DETACHED;
       break;
 
     case INPUTINTERPRETER_CMD_POWER_OFF_REQUEST:
@@ -235,12 +246,49 @@ static void InputInterpreter_PollBatteryEvents(void)
 }
 
 /**
+ * @brief VBUS 상태 변화를 감지해 Charger Attached/Detached 명령으로 변환한다.
+ * @details 임시 구현: InputInterpreter가 직접 GPIO 폴링.
+ *          장기적으로 VbusMonitor_Interface 별도 계층으로 분리 필요.
+ */
+static void InputInterpreter_PollVbusEvents(void)
+{
+  GPIO_PinState cur_vbus;
+  InputInterpreter_TranslatedCmd_t cmd;
+
+  cur_vbus = PowerControl_Drv_ReadUsbDetect();
+
+  if (cur_vbus == s_prev_vbus_state)
+  {
+    return;
+  }
+
+  s_prev_vbus_state = cur_vbus;
+
+  memset(&cmd, 0, sizeof(cmd));
+  cmd.target = INPUTINTERPRETER_TARGET_POWER;
+  cmd.timestamp_ms = HAL_GetTick();
+
+  if (cur_vbus == GPIO_PIN_SET)
+  {
+    cmd.cmd = INPUTINTERPRETER_CMD_CHARGER_ATTACHED;
+  }
+  else
+  {
+    cmd.cmd = INPUTINTERPRETER_CMD_CHARGER_DETACHED;
+  }
+
+  (void)InputInterpreter_Dispatch(&cmd);
+}
+
+/**
  * @brief InputInterpreter 내부 상태를 초기화한다.
  * @return 성공 시 0.
  */
 int32_t InputInterpreter_App_Init(void)
 {
   InputInterpreter_ResetLastTranslated();
+  /* 초기화 시 현재 VBUS 상태를 기록해 첫 폴링에서 spurious 이벤트 방지 */
+  s_prev_vbus_state = PowerControl_Drv_ReadUsbDetect();
   return 0;
 }
 
@@ -252,6 +300,7 @@ int32_t InputInterpreter_App_Run(void)
 {
   InputInterpreter_PollButtonEvents();
   InputInterpreter_PollBatteryEvents();
+  InputInterpreter_PollVbusEvents();
   return 0;
 }
 

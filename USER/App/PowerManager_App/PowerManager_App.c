@@ -1,11 +1,12 @@
 /* Power manager app (internal logic) */
 
 #include "PowerManager_App.h"
+#include "PowerControl_Drv.h"
 #include <string.h>
 
-#define POWERMANAGER_DEFAULT_IDLE_TIMEOUT_MS              (30000U)
-#define POWERMANAGER_DEFAULT_SLEEP_TIMEOUT_MS             (60000U)
-#define POWERMANAGER_DEFAULT_POWER_OFF_PENDING_TIMEOUT_MS (5000U)
+#define POWERMANAGER_DEFAULT_IDLE_TIMEOUT_MS             (600000U)
+#define POWERMANAGER_DEFAULT_SLEEP_TIMEOUT_MS             (300000U)
+#define POWERMANAGER_DEFAULT_POWER_OFF_NOTICE_TIMEOUT_MS  (3000U)
 #define POWERMANAGER_CMD_QUEUE_SIZE                       (8U)
 
 typedef struct
@@ -18,6 +19,7 @@ typedef struct
 
 static PowerManager_Context_t s_pm_ctx;
 static PowerManager_CmdQueue_t s_pm_cmd_q;
+static uint8_t s_hw_off_done;
 
 static void PowerManager_CmdQueue_Init(void);
 static int32_t PowerManager_CmdQueue_Push(PowerManager_Command_t cmd);
@@ -114,11 +116,17 @@ static void PowerManager_HandleCommand(PowerManager_Command_t cmd, uint32_t now_
 
     case POWERMANAGER_CMD_BATTERY_CRITICAL:
       s_pm_ctx.battery_critical_latched = 1U;
-      PowerManager_TransitionState(POWERMANAGER_STATE_POWER_OFF_PENDING, now_tick);
+      /* TODO: 즉시 POWER_OFF_NOTICE 전이 여부는 배터리 특성 검토 후 결정 */
       break;
 
     case POWERMANAGER_CMD_CHARGER_ATTACHED:
       s_pm_ctx.mode = POWERMANAGER_MODE_CHARGING;
+      /* 충전 연결 시 SLEEP 상태이면 STANDBY로 wakeup */
+      if (s_pm_ctx.state == POWERMANAGER_STATE_SLEEP)
+      {
+        PowerManager_TransitionState(POWERMANAGER_STATE_STANDBY, now_tick);
+        s_pm_ctx.last_activity_tick = now_tick;
+      }
       break;
 
     case POWERMANAGER_CMD_CHARGER_DETACHED:
@@ -157,21 +165,28 @@ static void PowerManager_RunStateMachine(uint32_t now_tick)
       break;
 
     case POWERMANAGER_STATE_SLEEP:
-      if (elapsed_state >= s_pm_ctx.sleep_timeout_ms)
+      /* DISCHARGING 모드에서만 경과시간 초과 시 전원 차단 절차 진입 */
+      if ((elapsed_state >= s_pm_ctx.sleep_timeout_ms) &&
+          (s_pm_ctx.mode == POWERMANAGER_MODE_DISCHARGING))
       {
-        PowerManager_TransitionState(POWERMANAGER_STATE_POWER_OFF_PENDING, now_tick);
+        PowerManager_TransitionState(POWERMANAGER_STATE_POWER_OFF_NOTICE, now_tick);
       }
       break;
 
-    case POWERMANAGER_STATE_POWER_OFF_PENDING:
-      if (elapsed_state >= s_pm_ctx.power_off_pending_timeout_ms)
+    case POWERMANAGER_STATE_POWER_OFF_NOTICE:
+      if (elapsed_state >= s_pm_ctx.power_off_notice_timeout_ms)
       {
         PowerManager_TransitionState(POWERMANAGER_STATE_POWER_OFF, now_tick);
       }
       break;
 
     case POWERMANAGER_STATE_POWER_OFF:
-      /* TODO: 실제 HW power hold 연동은 후속 단계에서 구현 */
+      /* 일회성 전원 차단 — 이미 차단했으면 재실행 방지 */
+      if (s_hw_off_done == 0U)
+      {
+        PowerControl_Drv_WriteHold(GPIO_PIN_RESET);
+        s_hw_off_done = 1U;
+      }
       break;
 
     default:
@@ -194,12 +209,24 @@ int32_t PowerManager_App_Init(void)
   now_tick = HAL_GetTick();
 
   s_pm_ctx.state = POWERMANAGER_STATE_BOOT;
-  s_pm_ctx.mode = POWERMANAGER_MODE_UNKNOWN;
+  /* 부팅 시 VBUS 상태를 읽어 mode 초기화 — 첫 VBUS 변화 전에도 SLEEP timeout 정책이 정상 동작하도록 함 */
+  if (PowerControl_Drv_ReadUsbDetect() == GPIO_PIN_SET)
+  {
+    s_pm_ctx.mode = POWERMANAGER_MODE_CHARGING;
+  }
+  else
+  {
+    s_pm_ctx.mode = POWERMANAGER_MODE_DISCHARGING;
+  }
   s_pm_ctx.state_enter_tick = now_tick;
   s_pm_ctx.last_activity_tick = now_tick;
   s_pm_ctx.idle_timeout_ms = POWERMANAGER_DEFAULT_IDLE_TIMEOUT_MS;
   s_pm_ctx.sleep_timeout_ms = POWERMANAGER_DEFAULT_SLEEP_TIMEOUT_MS;
-  s_pm_ctx.power_off_pending_timeout_ms = POWERMANAGER_DEFAULT_POWER_OFF_PENDING_TIMEOUT_MS;
+  s_pm_ctx.power_off_notice_timeout_ms = POWERMANAGER_DEFAULT_POWER_OFF_NOTICE_TIMEOUT_MS;
+
+  /* 부팅 시 전원 유지 핀 HIGH — 전원 차단 전까지 유지 */
+  s_hw_off_done = 0U;
+  PowerControl_Drv_WriteHold(GPIO_PIN_SET);
 
   return 0;
 }

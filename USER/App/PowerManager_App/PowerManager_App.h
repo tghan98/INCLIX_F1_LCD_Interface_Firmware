@@ -10,7 +10,7 @@ typedef enum
   POWERMANAGER_STATE_BOOT = 0,
   POWERMANAGER_STATE_STANDBY,
   POWERMANAGER_STATE_SLEEP,
-  POWERMANAGER_STATE_POWER_OFF_PENDING,
+  POWERMANAGER_STATE_POWER_OFF_NOTICE,
   POWERMANAGER_STATE_POWER_OFF
 } PowerManager_State_t;
 
@@ -41,7 +41,7 @@ typedef struct
   uint32_t last_activity_tick;
   uint32_t idle_timeout_ms;
   uint32_t sleep_timeout_ms;
-  uint32_t power_off_pending_timeout_ms;
+  uint32_t power_off_notice_timeout_ms;
   uint8_t battery_low_latched;
   uint8_t battery_critical_latched;
 } PowerManager_Context_t;
