@@ -100,7 +100,7 @@ static void PowerManager_HandleCommand(PowerManager_Command_t cmd, uint32_t now_
       }
       break;
 
-    case POWERMANAGER_CMD_FORCE_SLEEP:
+    case POWERMANAGER_CMD_SLEEP_REQUEST:
       PowerManager_TransitionState(POWERMANAGER_STATE_SLEEP, now_tick);
       break;
 

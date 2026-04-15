@@ -71,8 +71,8 @@ static int32_t InputInterpreter_DispatchToPower(const InputInterpreter_Translate
       power_cmd = POWERMANAGER_CMD_CHARGER_DETACHED;
       break;
 
-    case INPUTINTERPRETER_CMD_POWER_OFF_REQUEST:
-      power_cmd = POWERMANAGER_CMD_FORCE_SLEEP;
+    case INPUTINTERPRETER_CMD_SLEEP_REQUEST:
+      power_cmd = POWERMANAGER_CMD_SLEEP_REQUEST;
       break;
 
     default:
@@ -162,7 +162,7 @@ static void InputInterpreter_TranslateButtonEvent(const ButtonAppEvent_t* event)
     cmd.cmd = INPUTINTERPRETER_CMD_USER_ACTIVITY;
     (void)InputInterpreter_Dispatch(&cmd);
 
-    /* TODO: map long-press to INPUTINTERPRETER_CMD_POWER_OFF_REQUEST when supported */
+    /* TODO: map long-press to INPUTINTERPRETER_CMD_SLEEP_REQUEST when supported */
   }
   else
   {
@@ -287,7 +287,7 @@ static void InputInterpreter_PollVbusEvents(void)
 int32_t InputInterpreter_App_Init(void)
 {
   InputInterpreter_ResetLastTranslated();
-  /* 초기화 시 현재 VBUS 상태를 기록해 첫 폴링에서 spurious 이벤트 방지 */
+  /* 초기화 시 현재 VBUS 상태를 기록해 첫 폴링에서 가짜 이벤트 방지 */
   s_prev_vbus_state = PowerControl_Drv_ReadUsbDetect();
   return 0;
 }

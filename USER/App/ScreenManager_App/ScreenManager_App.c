@@ -73,9 +73,9 @@ static void ScreenManager_SetState(ScreenManager_State_t next_state)
 
 static void ScreenManager_HandleCommand(ScreenManager_Command_t cmd)
 {
-  if (cmd == SCREENMANAGER_CMD_SHOW_IDLE)
+  if (cmd == SCREENMANAGER_CMD_SHOW_STANDBY)
   {
-    ScreenManager_SetState(SCREENMANAGER_STATE_IDLE);
+    ScreenManager_SetState(SCREENMANAGER_STATE_STANDBY);
   }
   else if (cmd == SCREENMANAGER_CMD_SHOW_SLEEP)
   {
@@ -106,9 +106,9 @@ static void ScreenManager_RenderIfNeeded(void)
   {
     ST7735S_Drv_DrawString3x5(2U, 2U, "INCLIX BOOT", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
   }
-  else if (s_state == SCREENMANAGER_STATE_IDLE)
+  else if (s_state == SCREENMANAGER_STATE_STANDBY)
   {
-    ST7735S_Drv_DrawString3x5(2U, 2U, "INCLIX READY", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+    ST7735S_Drv_DrawString3x5(2U, 2U, "INCLIX STANDBY", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
     /* battery low latch 확인 — 저전압 상태일 때 "BAT LOW" 추가 표시 */
     if ((PowerManager_Interface_GetContext(&pm_ctx) == 0) &&
         (pm_ctx.battery_low_latched != 0U))
@@ -118,7 +118,11 @@ static void ScreenManager_RenderIfNeeded(void)
   }
   else if (s_state == SCREENMANAGER_STATE_SLEEP)
   {
-    /* 화면 소거만 — 텍스트 없음 (Sleep 종류) */
+    /* 화면 소거만 — 텍스트 없음 (Sleep 상태) */
+  }
+  else if (s_state == SCREENMANAGER_STATE_BLANK)
+  {
+    /* 화면 소거만 — 텍스트 없음 (Power off 이후 blank 상태) */
   }
   else if (s_state == SCREENMANAGER_STATE_POWER_OFF_NOTICE)
   {
@@ -157,7 +161,7 @@ int32_t ScreenManager_App_Run(void)
   if ((s_state == SCREENMANAGER_STATE_BOOT) &&
       ((HAL_GetTick() - s_state_enter_tick) >= SCREEN_BOOT_HOLD_MS))
   {
-    ScreenManager_SetState(SCREENMANAGER_STATE_IDLE);
+    ScreenManager_SetState(SCREENMANAGER_STATE_STANDBY);
   }
 
   /* PM 상태 폴링 — 변화 감지 시 화면 자동 전환 */
@@ -168,7 +172,7 @@ int32_t ScreenManager_App_Run(void)
       s_last_pm_state = pm_state;
       if (pm_state == POWERMANAGER_STATE_STANDBY)
       {
-        ScreenManager_SetState(SCREENMANAGER_STATE_IDLE);
+        ScreenManager_SetState(SCREENMANAGER_STATE_STANDBY);
       }
       else if (pm_state == POWERMANAGER_STATE_SLEEP)
       {
@@ -180,11 +184,11 @@ int32_t ScreenManager_App_Run(void)
       }
       else if (pm_state == POWERMANAGER_STATE_POWER_OFF)
       {
-        ScreenManager_SetState(SCREENMANAGER_STATE_SLEEP);
+        ScreenManager_SetState(SCREENMANAGER_STATE_BLANK);
       }
       else
       {
-        /* BOOT 상태는 자체 타이머로 처리 — 덮어쓰지 않음 */
+        /* BOOT 상태는 HAL_GetTick() 경과시간 비교로 처리 — 덮어쓰지 않음 */
       }
     }
   }
