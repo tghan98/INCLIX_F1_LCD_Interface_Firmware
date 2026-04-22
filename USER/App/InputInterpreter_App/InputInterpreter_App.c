@@ -4,6 +4,7 @@
 
 #include "App/Button_App/Button_Interface.h"
 #include "App/BatteryMonitor_App/BatteryMonitor_Interface.h"
+#include "App/CodeChip_App/CodeChip_Interface.h"
 #include "App/PowerManager_App/PowerManager_Interface.h"
 #include "App/SequenceManager_App/SequenceManager_Interface.h"
 
@@ -22,8 +23,10 @@ static int32_t InputInterpreter_DispatchToAnalysis(const InputInterpreter_Transl
 static int32_t InputInterpreter_Dispatch(const InputInterpreter_TranslatedCmd_t* cmd);
 static void InputInterpreter_TranslateButtonEvent(const ButtonAppEvent_t* event);
 static void InputInterpreter_TranslateBatteryEvent(const BatteryMonitor_AppEvent_t* event);
+static void InputInterpreter_TranslateCodeChipEvent(const CodeChip_AppEvent_t* event);
 static void InputInterpreter_PollButtonEvents(void);
 static void InputInterpreter_PollBatteryEvents(void);
+static void InputInterpreter_PollCodeChipEvents(void);
 static void InputInterpreter_PollVbusEvents(void);
 
 /**
@@ -101,6 +104,10 @@ static int32_t InputInterpreter_DispatchToAnalysis(const InputInterpreter_Transl
   {
     case INPUTINTERPRETER_CMD_ANALYSIS_START_REQUEST:
       sequence_cmd = SEQUENCEMANAGER_CMD_START_REQUEST;
+      break;
+
+    case INPUTINTERPRETER_CMD_CODECHIP_READY:
+      sequence_cmd = SEQUENCEMANAGER_CMD_CODECHIP_READY;
       break;
 
     default:
@@ -236,6 +243,47 @@ static void InputInterpreter_TranslateBatteryEvent(const BatteryMonitor_AppEvent
 }
 
 /**
+ * @brief CodeChip 원시 이벤트를 의미 명령으로 변환한다.
+ * @param event CodeChip_Interface에서 받은 이벤트.
+ */
+static void InputInterpreter_TranslateCodeChipEvent(const CodeChip_AppEvent_t* event)
+{
+  InputInterpreter_TranslatedCmd_t cmd;
+
+  if (event == NULL)
+  {
+    return;
+  }
+
+  memset(&cmd, 0, sizeof(cmd));
+  cmd.target       = INPUTINTERPRETER_TARGET_ANALYSIS;
+  cmd.timestamp_ms = HAL_GetTick();
+
+  if (event->event == CODECHIP_EVENT_INSERTED)
+  {
+    cmd.cmd = INPUTINTERPRETER_CMD_CODECHIP_READY;
+    (void)InputInterpreter_Dispatch(&cmd);
+  }
+  else
+  {
+    /* 이번 단계에서 제거 이벤트는 SequenceManager 명령으로 변환하지 않는다. */
+  }
+}
+
+/**
+ * @brief CodeChip 이벤트 큐를 모두 읽어 변환 처리한다.
+ */
+static void InputInterpreter_PollCodeChipEvents(void)
+{
+  CodeChip_AppEvent_t event;
+
+  while (CodeChip_Interface_GetEvent(&event) == 0)
+  {
+    InputInterpreter_TranslateCodeChipEvent(&event);
+  }
+}
+
+/**
  * @brief 버튼 이벤트 큐를 모두 읽어 변환 처리한다.
  */
 static void InputInterpreter_PollButtonEvents(void)
@@ -316,6 +364,7 @@ int32_t InputInterpreter_App_Run(void)
 {
   InputInterpreter_PollButtonEvents();
   InputInterpreter_PollBatteryEvents();
+  InputInterpreter_PollCodeChipEvents();
   InputInterpreter_PollVbusEvents();
   return 0;
 }

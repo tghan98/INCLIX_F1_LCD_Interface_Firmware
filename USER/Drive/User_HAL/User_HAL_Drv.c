@@ -187,6 +187,7 @@ void HW_LCD_Reset(uint32_t on_off)
   */
 void HW_LCD_CS_Select(uint32_t select)
 {
+#if defined(LCD_CS_GPIO_Port) && defined(LCD_CS_Pin)
   /* LCD CS는 active-low 이므로, 선택 시 Low / 해제 시 High를 출력한다. */
   if (select != 0U)
   {
@@ -196,6 +197,9 @@ void HW_LCD_CS_Select(uint32_t select)
   {
     HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, GPIO_PIN_SET);
   }
+#else
+  (void)select;
+#endif
 }
 
 /**

@@ -2,6 +2,7 @@
 
 #include "Button_Interface.h"
 #include "BatteryMonitor_Interface.h"
+#include "App/CodeChip_App/CodeChip_Interface.h"
 #include "App/InputInterpreter_App/InputInterpreter_Interface.h"
 #include "App/SequenceManager_App/SequenceManager_Interface.h"
 #include "App/PowerManager_App/PowerManager_Interface.h"
@@ -27,7 +28,10 @@ int32_t User_Main_Init(void)
   /* 3) 배터리 모니터링 초기화 — ADC 기반 레벨 측정 생산자 */
   BatteryMonitor_Interface_Init();
 
-  /* 4) 입력 해석기 초기화 — Button/Battery 이벤트를 의미 명령으로 변환 */
+  /* 4) CodeChip 인터페이스 초기화 — SD card detect GPIO 폴링 생산자 */
+  CodeChip_Interface_Init();
+
+  /* 5) 입력 해석기 초기화 — Button/Battery/CodeChip 이벤트를 의미 명령으로 변환 */
   InputInterpreter_Interface_Init();
 
   /* 5) 검사 절차 상태머신 초기화 — 분석 skeleton 상태 owner */
@@ -59,7 +63,10 @@ int32_t User_Main_Run(void)
   /* 2) 배터리 레벨 측정 — ADC 결과를 이벤트로 변환하여 큐에 채움 */
   BatteryMonitor_Interface_Run();
 
-  /* 3) 입력 해석 — Button/Battery 이벤트를 소비하여 Power/Analysis 명령으로 변환 */
+  /* 3) CodeChip 감지 — SD detect GPIO를 폴링하여 삽입/제거 이벤트를 큐에 쉡 */
+  CodeChip_Interface_Run();
+
+  /* 4) 입력 해석 — Button/Battery/CodeChip 이벤트를 소비하여 Power/Analysis 명령으로 변환 */
   InputInterpreter_Interface_Run();
 
   /* 4) 검사 절차 실행 — 분석 시작 요청과 절차 상태 전이를 반영 */

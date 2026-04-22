@@ -16,14 +16,10 @@ typedef struct
   uint32_t count;
 } SequenceManager_CmdQueue_t;
 
-/* 현재 검사 절차 상태 */
-static SequenceManager_State_t s_state;
-/* 현재 상태 진입 시각 */
-static uint32_t s_state_enter_tick;
-/* 전원 복귀 후 반영할 시작 요청 보관 플래그 */
-static uint8_t s_pending_start_request;
-/* 내부 명령 큐 인스턴스 */
-static SequenceManager_CmdQueue_t s_cmd_queue;
+static SequenceManager_State_t s_state;          // 현재 검사절차 상태
+static uint32_t s_state_enter_tick;              // 현재 상태에 진입한 시각 (ms 단위)
+static uint8_t s_pending_start_request;          // 전원 복귀 후 반영할 시작 요청 보관 플래그
+static SequenceManager_CmdQueue_t s_cmd_queue;   // SequenceManager 명령 큐 인스턴스
 
 static void SequenceManager_CmdQueue_Init(void);
 static int32_t SequenceManager_CmdQueue_Push(SequenceManager_Command_t cmd);
@@ -37,6 +33,7 @@ static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd);
  */
 static void SequenceManager_CmdQueue_Init(void)
 {
+  // 1) 읽기 위치, 쓰기 위치, 저장 개수를 0으로 초기화
   s_cmd_queue.head = 0U;
   s_cmd_queue.tail = 0U;
   s_cmd_queue.count = 0U;
@@ -50,13 +47,17 @@ static void SequenceManager_CmdQueue_Init(void)
  */
 static int32_t SequenceManager_CmdQueue_Push(SequenceManager_Command_t cmd)
 {
+  // 1) 큐가 가득 찼으면 저장하지 않고 실패 반환
   if (s_cmd_queue.count >= SEQUENCEMANAGER_CMD_QUEUE_SIZE)
   {
     return -1;
   }
 
+  // 2) 현재 tail 위치에 명령 저장
   s_cmd_queue.buffer[s_cmd_queue.tail] = cmd;
+  // 3) tail 인덱스를 순환 방식으로 한 칸 전진
   s_cmd_queue.tail = (s_cmd_queue.tail + 1U) % SEQUENCEMANAGER_CMD_QUEUE_SIZE;
+  // 4) 저장된 명령 개수를 1 증가
   s_cmd_queue.count++;
 
   return 0;
@@ -70,13 +71,17 @@ static int32_t SequenceManager_CmdQueue_Push(SequenceManager_Command_t cmd)
  */
 static int32_t SequenceManager_CmdQueue_Pop(SequenceManager_Command_t* out_cmd)
 {
+  // 1) 출력 포인터가 NULL이거나 큐가 비어 있으면 실패 반환
   if ((out_cmd == NULL) || (s_cmd_queue.count == 0U))
   {
     return -1;
   }
 
+  // 2) 현재 head 위치의 명령을 출력 포인터에 복사
   *out_cmd = s_cmd_queue.buffer[s_cmd_queue.head];
+  // 3) head 인덱스를 순환 방식으로 한 칸 전진
   s_cmd_queue.head = (s_cmd_queue.head + 1U) % SEQUENCEMANAGER_CMD_QUEUE_SIZE;
+  // 4) 저장된 명령 개수를 1 감소
   s_cmd_queue.count--;
 
   return 0;
@@ -88,7 +93,9 @@ static int32_t SequenceManager_CmdQueue_Pop(SequenceManager_Command_t* out_cmd)
  */
 static void SequenceManager_SetState(SequenceManager_State_t next_state)
 {
+  // 1) 현재 상태를 새 상태로 교체
   s_state = next_state;
+  // 2) 새 상태에 진입한 시각을 기록
   s_state_enter_tick = HAL_GetTick();
 }
 
@@ -113,16 +120,19 @@ static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd)
 {
   PowerManager_State_t power_state;
 
+  // 1) 현재 전원 상태 조회
   power_state = PowerManager_Interface_GetState();
 
+  // 2) 수신 명령 종류에 따라 상태 전이 처리
   switch (cmd)
   {
     case SEQUENCEMANAGER_CMD_START_REQUEST:
+      // IDLE 상태가 아니면 시작 요청 무시
       if (s_state != SEQUENCEMANAGER_STATE_IDLE)
       {
         break;
       }
-
+      // 표시 가능 전원 상태이면 WAIT_CODECHIP으로 즉시 전이, 아니면 pending 보관
       if (SequenceManager_IsDisplayCapableState(power_state) != 0U)
       {
         s_pending_start_request = 0U;
@@ -135,6 +145,7 @@ static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd)
       break;
 
     case SEQUENCEMANAGER_CMD_CODECHIP_READY:
+      // WAIT_CODECHIP 상태이면 WAIT_CASSETTE로 전이
       if (s_state == SEQUENCEMANAGER_STATE_WAIT_CODECHIP)
       {
         SequenceManager_SetState(SEQUENCEMANAGER_STATE_WAIT_CASSETTE);
@@ -142,6 +153,7 @@ static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd)
       break;
 
     case SEQUENCEMANAGER_CMD_CASSETTE_READY:
+      // WAIT_CASSETTE 상태이면 MEASURING으로 전이
       if (s_state == SEQUENCEMANAGER_STATE_WAIT_CASSETTE)
       {
         SequenceManager_SetState(SEQUENCEMANAGER_STATE_MEASURING);
@@ -149,6 +161,7 @@ static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd)
       break;
 
     case SEQUENCEMANAGER_CMD_MEASUREMENT_DONE:
+      // MEASURING 상태이면 CALCULATING으로 전이
       if (s_state == SEQUENCEMANAGER_STATE_MEASURING)
       {
         SequenceManager_SetState(SEQUENCEMANAGER_STATE_CALCULATING);
@@ -156,6 +169,7 @@ static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd)
       break;
 
     case SEQUENCEMANAGER_CMD_CALCULATION_DONE:
+      // CALCULATING 상태이면 RESULT_DISPLAY로 전이
       if (s_state == SEQUENCEMANAGER_STATE_CALCULATING)
       {
         SequenceManager_SetState(SEQUENCEMANAGER_STATE_RESULT_DISPLAY);
@@ -163,6 +177,7 @@ static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd)
       break;
 
     case SEQUENCEMANAGER_CMD_RESET:
+      // pending 플래그를 해제하고 IDLE로 복귀
       s_pending_start_request = 0U;
       SequenceManager_SetState(SEQUENCEMANAGER_STATE_IDLE);
       break;
@@ -179,9 +194,13 @@ static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd)
  */
 int32_t SequenceManager_App_Init(void)
 {
+  // 1) 명령 큐 인덱스와 개수 초기화
   SequenceManager_CmdQueue_Init();
+  // 2) pending 시작 요청 플래그 초기화
   s_pending_start_request = 0U;
+  // 3) 초기 상태를 IDLE로 설정
   s_state = SEQUENCEMANAGER_STATE_IDLE;
+  // 4) 상태 진입 시각 기록
   s_state_enter_tick = HAL_GetTick();
 
   return 0;
@@ -195,15 +214,18 @@ int32_t SequenceManager_App_Run(void)
 {
   SequenceManager_Command_t cmd;
 
+  // 1) 큐에 쌓인 명령을 모두 꺼내 처리
   while (SequenceManager_CmdQueue_Pop(&cmd) == 0)
   {
     SequenceManager_HandleCommand(cmd);
   }
 
+  // 2) pending 시작 요청이 있고 IDLE 상태이며 전원이 복귀했는지 확인
   if ((s_pending_start_request != 0U) &&
       (s_state == SEQUENCEMANAGER_STATE_IDLE) &&
       (SequenceManager_IsDisplayCapableState(PowerManager_Interface_GetState()) != 0U))
   {
+    // 3) pending 플래그 해제 후 WAIT_CODECHIP으로 전이
     s_pending_start_request = 0U;
     SequenceManager_SetState(SEQUENCEMANAGER_STATE_WAIT_CODECHIP);
   }
