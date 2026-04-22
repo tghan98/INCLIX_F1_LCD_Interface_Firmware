@@ -1195,6 +1195,15 @@
             <name>$PROJ_DIR$\..\USER\App\ScreenManager_App\ScreenManager_Interface.c</name>
           </file>
         </group>
+        <group>
+          <name>SequenceManager_App</name>
+          <file>
+            <name>$PROJ_DIR$\..\USER\App\SequenceManager_App\SequenceManager_App.c</name>
+          </file>
+          <file>
+            <name>$PROJ_DIR$\..\USER\App\SequenceManager_App\SequenceManager_Interface.c</name>
+          </file>
+        </group>
       </group>
       <group>
         <name>Drive</name>

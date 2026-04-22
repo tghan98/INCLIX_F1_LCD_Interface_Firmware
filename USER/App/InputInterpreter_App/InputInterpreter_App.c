@@ -5,6 +5,7 @@
 #include "App/Button_App/Button_Interface.h"
 #include "App/BatteryMonitor_App/BatteryMonitor_Interface.h"
 #include "App/PowerManager_App/PowerManager_Interface.h"
+#include "App/SequenceManager_App/SequenceManager_Interface.h"
 
 #include "BatteryMonitor_App.h"
 #include "Button_Drv.h"
@@ -17,7 +18,7 @@ static GPIO_PinState s_prev_vbus_state;
 
 static void InputInterpreter_ResetLastTranslated(void);
 static int32_t InputInterpreter_DispatchToPower(const InputInterpreter_TranslatedCmd_t* cmd);
-static int32_t InputInterpreter_DispatchToAnalysisSkeleton(const InputInterpreter_TranslatedCmd_t* cmd);
+static int32_t InputInterpreter_DispatchToAnalysis(const InputInterpreter_TranslatedCmd_t* cmd);
 static int32_t InputInterpreter_Dispatch(const InputInterpreter_TranslatedCmd_t* cmd);
 static void InputInterpreter_TranslateButtonEvent(const ButtonAppEvent_t* event);
 static void InputInterpreter_TranslateBatteryEvent(const BatteryMonitor_AppEvent_t* event);
@@ -83,15 +84,30 @@ static int32_t InputInterpreter_DispatchToPower(const InputInterpreter_Translate
 }
 
 /**
- * @brief Analysis 도메인 전달 연결점(현재는 skeleton).
+ * @brief Analysis 도메인 명령을 SequenceManager 명령으로 변환해 전달한다.
  * @param cmd 변환된 입력 명령.
- * @return 현재 단계에서는 항상 0.
+ * @return 성공 시 0, 입력 포인터가 NULL이면 -1, 큐 오류 시 음수.
  */
-static int32_t InputInterpreter_DispatchToAnalysisSkeleton(const InputInterpreter_TranslatedCmd_t* cmd)
+static int32_t InputInterpreter_DispatchToAnalysis(const InputInterpreter_TranslatedCmd_t* cmd)
 {
-  (void)cmd;
-  /* TODO: connect AnalysisSequenceManager submit API in next phase */
-  return 0;
+  SequenceManager_Command_t sequence_cmd;
+
+  if (cmd == NULL)
+  {
+    return -1;
+  }
+
+  switch (cmd->cmd)
+  {
+    case INPUTINTERPRETER_CMD_ANALYSIS_START_REQUEST:
+      sequence_cmd = SEQUENCEMANAGER_CMD_START_REQUEST;
+      break;
+
+    default:
+      return 0;
+  }
+
+  return SequenceManager_Interface_SubmitCommand(sequence_cmd);
 }
 
 /**
@@ -114,7 +130,7 @@ static int32_t InputInterpreter_Dispatch(const InputInterpreter_TranslatedCmd_t*
   }
   else if (cmd->target == INPUTINTERPRETER_TARGET_ANALYSIS)
   {
-    result = InputInterpreter_DispatchToAnalysisSkeleton(cmd);
+    result = InputInterpreter_DispatchToAnalysis(cmd);
   }
   else
   {

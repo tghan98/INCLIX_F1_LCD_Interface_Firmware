@@ -4,6 +4,7 @@
 
 #include "ST7735S_Drv.h"
 #include "App/PowerManager_App/PowerManager_Interface.h"
+#include "App/SequenceManager_App/SequenceManager_Interface.h"
 
 #define SCREEN_BG_COLOR              0x0000U
 #define SCREEN_TEXT_COLOR            0xFFFFU
@@ -22,86 +23,208 @@ static ScreenManager_State_t s_state;
 static uint32_t s_state_enter_tick;
 static uint8_t s_need_redraw;
 static ScreenManager_CmdQueue_t s_cmd_queue;
-static PowerManager_State_t s_last_pm_state;
 
 static void ScreenManager_CmdQueue_Init(void);
 static int32_t ScreenManager_CmdQueue_Push(ScreenManager_Command_t cmd);
 static int32_t ScreenManager_CmdQueue_Pop(ScreenManager_Command_t* out_cmd);
 static void ScreenManager_SetState(ScreenManager_State_t next_state);
 static void ScreenManager_HandleCommand(ScreenManager_Command_t cmd);
+static uint8_t ScreenManager_IsDisplayScene(ScreenManager_State_t state);
+static ScreenManager_State_t ScreenManager_ResolveState(PowerManager_State_t pm_state,
+                                                        SequenceManager_State_t seq_state);
 static void ScreenManager_RenderIfNeeded(void);
 
+/**
+  * @brief  화면 명령 큐의 인덱스와 개수를 초기화합니다.
+  * @param  None
+  * @retval None
+  */
 static void ScreenManager_CmdQueue_Init(void)
 {
+  // 1) 큐 시작 상태를 비워진 상태로 맞춥니다.
   s_cmd_queue.head = 0U;
   s_cmd_queue.tail = 0U;
   s_cmd_queue.count = 0U;
 }
 
+/**
+  * @brief  화면 전환 명령을 큐에 저장합니다.
+  * @param  cmd 저장할 화면 명령
+  * @retval 0  저장 성공
+  * @retval -1 큐가 가득 찬 경우
+  */
 static int32_t ScreenManager_CmdQueue_Push(ScreenManager_Command_t cmd)
 {
+  // 1) 큐가 가득 찼으면 더 이상 저장하지 않습니다.
   if (s_cmd_queue.count >= SCREEN_CMD_QUEUE_SIZE)
   {
     return -1;
   }
 
+  // 2) 현재 tail 위치에 명령을 저장합니다.
   s_cmd_queue.buffer[s_cmd_queue.tail] = cmd;
+
+  // 3) tail과 개수를 갱신해 다음 저장 위치를 준비합니다.
   s_cmd_queue.tail = (s_cmd_queue.tail + 1U) % SCREEN_CMD_QUEUE_SIZE;
   s_cmd_queue.count++;
   return 0;
 }
 
+/**
+  * @brief  화면 명령 큐에서 다음 명령을 하나 꺼냅니다.
+  * @param  out_cmd 꺼낸 명령을 저장할 출력 포인터
+  * @retval 0  명령 읽기 성공
+  * @retval -1 출력 포인터가 NULL이거나 큐가 비어 있는 경우
+  */
 static int32_t ScreenManager_CmdQueue_Pop(ScreenManager_Command_t* out_cmd)
 {
+  // 1) 출력 버퍼가 없거나 큐가 비어 있으면 읽지 않습니다.
   if ((out_cmd == NULL) || (s_cmd_queue.count == 0U))
   {
     return -1;
   }
 
+  // 2) head 위치의 명령을 호출자에게 전달합니다.
   *out_cmd = s_cmd_queue.buffer[s_cmd_queue.head];
+
+  // 3) head와 개수를 갱신해 다음 읽기 위치를 준비합니다.
   s_cmd_queue.head = (s_cmd_queue.head + 1U) % SCREEN_CMD_QUEUE_SIZE;
   s_cmd_queue.count--;
   return 0;
 }
 
+/**
+  * @brief  화면 상태를 변경하고 redraw 요청을 설정합니다.
+  * @param  next_state 전이할 다음 화면 상태
+  * @retval None
+  */
 static void ScreenManager_SetState(ScreenManager_State_t next_state)
 {
+  // 1) 현재 화면 상태를 새 상태로 바꿉니다.
   s_state = next_state;
+
+  // 2) 상태 진입 시각을 기록해 시간 기반 정책에 사용합니다.
   s_state_enter_tick = HAL_GetTick();
+
+  // 3) 다음 Run에서 화면을 다시 그리도록 redraw를 요청합니다.
   s_need_redraw = 1U;
 }
 
+/**
+  * @brief  수신한 화면 명령에 따라 화면 상태를 전환합니다.
+  * @param  cmd 처리할 화면 명령
+  * @retval None
+  */
 static void ScreenManager_HandleCommand(ScreenManager_Command_t cmd)
 {
+  // 1) 외부 명령이 Standby 요청이면 Standby 화면 상태로 전환합니다.
   if (cmd == SCREENMANAGER_CMD_SHOW_STANDBY)
   {
     ScreenManager_SetState(SCREENMANAGER_STATE_STANDBY);
   }
+  // 2) Sleep 요청이면 Sleep 화면 상태로 전환합니다.
   else if (cmd == SCREENMANAGER_CMD_SHOW_SLEEP)
   {
     ScreenManager_SetState(SCREENMANAGER_STATE_SLEEP);
   }
+  // 3) Power-off notice 요청이면 종료 안내 화면 상태로 전환합니다.
   else if (cmd == SCREENMANAGER_CMD_SHOW_POWER_OFF_NOTICE)
   {
     ScreenManager_SetState(SCREENMANAGER_STATE_POWER_OFF_NOTICE);
   }
+  // 4) 그 외 명령은 이 단계에서 처리하지 않습니다.
   else
   {
     /* no-op */
   }
 }
 
+static uint8_t ScreenManager_IsDisplayScene(ScreenManager_State_t state)
+{
+  // 1) 텍스트나 overlay를 표시할 수 있는 장면만 display scene으로 봅니다.
+  switch (state)
+  {
+    case SCREENMANAGER_STATE_STANDBY:
+    case SCREENMANAGER_STATE_WAIT_CODECHIP:
+    case SCREENMANAGER_STATE_WAIT_CASSETTE:
+    case SCREENMANAGER_STATE_MEASURING:
+    case SCREENMANAGER_STATE_CALCULATING:
+    case SCREENMANAGER_STATE_RESULT_DISPLAY:
+      return 1U;
+
+    case SCREENMANAGER_STATE_BOOT:
+    case SCREENMANAGER_STATE_SLEEP:
+    case SCREENMANAGER_STATE_BLANK:
+    case SCREENMANAGER_STATE_POWER_OFF_NOTICE:
+    default:
+      return 0U;
+  }
+}
+
+static ScreenManager_State_t ScreenManager_ResolveState(PowerManager_State_t pm_state,
+                                                        SequenceManager_State_t seq_state)
+{
+  // 1) Sleep 상태는 검사 상태보다 우선해서 Sleep 장면으로 고정합니다.
+  if (pm_state == POWERMANAGER_STATE_SLEEP)
+  {
+    return SCREENMANAGER_STATE_SLEEP;
+  }
+
+  // 2) 전원 차단 안내 상태도 검사 상태보다 우선합니다.
+  if (pm_state == POWERMANAGER_STATE_POWER_OFF_NOTICE)
+  {
+    return SCREENMANAGER_STATE_POWER_OFF_NOTICE;
+  }
+
+  // 3) 실제 전원 차단 상태에서는 blank 장면으로 보냅니다.
+  if (pm_state == POWERMANAGER_STATE_POWER_OFF)
+  {
+    return SCREENMANAGER_STATE_BLANK;
+  }
+
+  // 4) 전원 쪽에서 강제할 장면이 없으면 검사 상태를 화면 상태로 변환합니다.
+  switch (seq_state)
+  {
+    case SEQUENCEMANAGER_STATE_WAIT_CODECHIP:
+      return SCREENMANAGER_STATE_WAIT_CODECHIP;
+
+    case SEQUENCEMANAGER_STATE_WAIT_CASSETTE:
+      return SCREENMANAGER_STATE_WAIT_CASSETTE;
+
+    case SEQUENCEMANAGER_STATE_MEASURING:
+      return SCREENMANAGER_STATE_MEASURING;
+
+    case SEQUENCEMANAGER_STATE_CALCULATING:
+      return SCREENMANAGER_STATE_CALCULATING;
+
+    case SEQUENCEMANAGER_STATE_RESULT_DISPLAY:
+      return SCREENMANAGER_STATE_RESULT_DISPLAY;
+
+    case SEQUENCEMANAGER_STATE_IDLE:
+    default:
+      return SCREENMANAGER_STATE_STANDBY;
+  }
+}
+
+/**
+  * @brief  redraw 요청이 있을 때 현재 상태에 맞는 화면을 다시 그립니다.
+  * @param  None
+  * @retval None
+  */
 static void ScreenManager_RenderIfNeeded(void)
 {
   PowerManager_Context_t pm_ctx;
 
+  // 1) redraw 요청이 없으면 이번 주기에는 아무 것도 그리지 않습니다.
   if (s_need_redraw == 0U)
   {
     return;
   }
 
+  // 2) 새 장면을 그리기 전에 화면을 먼저 지웁니다.
   ST7735S_Drv_Clear(SCREEN_BG_COLOR);
 
+  // 3) 현재 화면 상태에 맞는 기본 문자열을 출력합니다.
   if (s_state == SCREENMANAGER_STATE_BOOT)
   {
     ST7735S_Drv_DrawString3x5(2U, 2U, "INCLIX BOOT", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
@@ -109,12 +232,26 @@ static void ScreenManager_RenderIfNeeded(void)
   else if (s_state == SCREENMANAGER_STATE_STANDBY)
   {
     ST7735S_Drv_DrawString3x5(2U, 2U, "INCLIX STANDBY", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
-    /* battery low latch 확인 — 저전압 상태일 때 "BAT LOW" 추가 표시 */
-    if ((PowerManager_Interface_GetContext(&pm_ctx) == 0) &&
-        (pm_ctx.battery_low_latched != 0U))
-    {
-      ST7735S_Drv_DrawString3x5(2U, 12U, "BAT LOW", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
-    }
+  }
+  else if (s_state == SCREENMANAGER_STATE_WAIT_CODECHIP)
+  {
+    ST7735S_Drv_DrawString3x5(2U, 2U, "INSERT CODECHIP", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+  }
+  else if (s_state == SCREENMANAGER_STATE_WAIT_CASSETTE)
+  {
+    ST7735S_Drv_DrawString3x5(2U, 2U, "INSERT CASSETTE", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+  }
+  else if (s_state == SCREENMANAGER_STATE_MEASURING)
+  {
+    ST7735S_Drv_DrawString3x5(2U, 2U, "MEASURING...", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+  }
+  else if (s_state == SCREENMANAGER_STATE_CALCULATING)
+  {
+    ST7735S_Drv_DrawString3x5(2U, 2U, "CALCULATING...", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+  }
+  else if (s_state == SCREENMANAGER_STATE_RESULT_DISPLAY)
+  {
+    ST7735S_Drv_DrawString3x5(2U, 2U, "RESULT READY", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
   }
   else if (s_state == SCREENMANAGER_STATE_SLEEP)
   {
@@ -133,78 +270,106 @@ static void ScreenManager_RenderIfNeeded(void)
     /* no-op */
   }
 
+  // 4) display scene에서는 battery low overlay를 추가로 출력할 수 있습니다.
+  if ((ScreenManager_IsDisplayScene(s_state) != 0U) &&
+      (PowerManager_Interface_GetContext(&pm_ctx) == 0) &&
+      (pm_ctx.battery_low_latched != 0U))
+  {
+    ST7735S_Drv_DrawString3x5(2U, 12U, "BAT LOW", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+  }
+
+  // 5) redraw를 끝냈으므로 요청 플래그를 내립니다.
   s_need_redraw = 0U;
 }
 
+/**
+  * @brief  LCD 드라이버와 화면 매니저 상태를 초기화합니다.
+  * @param  None
+  * @retval 0 초기화 성공
+  */
 int32_t ScreenManager_App_Init(void)
 {
+  // 1) LCD 드라이버를 먼저 초기화합니다.
   ST7735S_Drv_Init();
 
+  // 2) 화면 명령 큐를 비우고 초기 화면 상태를 BOOT로 맞춥니다.
   ScreenManager_CmdQueue_Init();
   s_state = SCREENMANAGER_STATE_BOOT;
+
+  // 3) BOOT 진입 시각과 첫 redraw 요청을 설정합니다.
   s_state_enter_tick = HAL_GetTick();
   s_need_redraw = 1U;
-  s_last_pm_state = POWERMANAGER_STATE_BOOT;
 
   return 0;
 }
 
+/**
+  * @brief  화면 명령 처리, 부팅 화면 타이머, 전원 상태 동기화, redraw를 수행합니다.
+  * @param  None
+  * @retval 0 실행 성공
+  */
 int32_t ScreenManager_App_Run(void)
 {
   ScreenManager_Command_t cmd;
+  ScreenManager_State_t next_state;
+  PowerManager_State_t pm_state;
+  SequenceManager_State_t seq_state;
 
+  // 1) 큐에 쌓인 화면 전환 명령을 모두 꺼내 현재 상태에 반영합니다.
+  // TODO: 이 while문은 자칫 한 곳에 오래 머무를 수 있으므로, 재설계 시 큐에서 한 번에 하나씩 처리하는 방식을 검토해야함.
   while (ScreenManager_CmdQueue_Pop(&cmd) == 0)
   {
     ScreenManager_HandleCommand(cmd);
   }
 
+  // 2) 부팅 화면 유지 시간이 경과하면 Standby 화면으로 자동 전환합니다.
   if ((s_state == SCREENMANAGER_STATE_BOOT) &&
       ((HAL_GetTick() - s_state_enter_tick) >= SCREEN_BOOT_HOLD_MS))
   {
-    ScreenManager_SetState(SCREENMANAGER_STATE_STANDBY);
+    pm_state = PowerManager_Interface_GetState();
+    seq_state = SequenceManager_Interface_GetState();
+    ScreenManager_SetState(ScreenManager_ResolveState(pm_state, seq_state));
   }
 
-  /* PM 상태 폴링 — 변화 감지 시 화면 자동 전환 */
+  // 3) BOOT 이후에는 전원축과 검사축을 조합해 최종 장면을 재결정합니다.
+  if (s_state != SCREENMANAGER_STATE_BOOT)
   {
-    PowerManager_State_t pm_state = PowerManager_Interface_GetState();
-    if (pm_state != s_last_pm_state)
+    pm_state = PowerManager_Interface_GetState();
+    seq_state = SequenceManager_Interface_GetState();
+    next_state = ScreenManager_ResolveState(pm_state, seq_state);
+
+    if (next_state != s_state)
     {
-      s_last_pm_state = pm_state;
-      if (pm_state == POWERMANAGER_STATE_STANDBY)
-      {
-        ScreenManager_SetState(SCREENMANAGER_STATE_STANDBY);
-      }
-      else if (pm_state == POWERMANAGER_STATE_SLEEP)
-      {
-        ScreenManager_SetState(SCREENMANAGER_STATE_SLEEP);
-      }
-      else if (pm_state == POWERMANAGER_STATE_POWER_OFF_NOTICE)
-      {
-        ScreenManager_SetState(SCREENMANAGER_STATE_POWER_OFF_NOTICE);
-      }
-      else if (pm_state == POWERMANAGER_STATE_POWER_OFF)
-      {
-        ScreenManager_SetState(SCREENMANAGER_STATE_BLANK);
-      }
-      else
-      {
-        /* BOOT 상태는 HAL_GetTick() 경과시간 비교로 처리 — 덮어쓰지 않음 */
-      }
+      ScreenManager_SetState(next_state);
     }
   }
 
+  // 4) redraw 요청이 있는 경우에만 현재 상태에 맞는 화면을 다시 그립니다.
   ScreenManager_RenderIfNeeded();
 
   return 0;
 }
 
+/**
+  * @brief  외부에서 요청한 화면 전환 명령을 큐에 등록합니다.
+  * @param  cmd 등록할 화면 명령
+  * @retval 0  등록 성공
+  * @retval -1 큐가 가득 찬 경우
+  */
 int32_t ScreenManager_App_SubmitCommand(ScreenManager_Command_t cmd)
 {
+  // 1) 외부 요청 명령을 내부 큐에 저장합니다.
   return ScreenManager_CmdQueue_Push(cmd);
 }
 
+/**
+  * @brief  현재 화면 상태를 반환합니다.
+  * @param  None
+  * @retval 현재 ScreenManager 상태값
+  */
 ScreenManager_State_t ScreenManager_App_GetState(void)
 {
+  // 1) 현재 화면 상태 스냅샷을 그대로 반환합니다.
   return s_state;
 }
 
