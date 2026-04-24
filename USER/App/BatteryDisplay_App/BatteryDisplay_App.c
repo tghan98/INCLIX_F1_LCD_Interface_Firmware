@@ -7,12 +7,16 @@
 #include "ST7735S_Drv.h"
 
 #define BATTERYDISPLAY_LEVEL_INVALID  0xFFFFFFFFU
+/* [LEGACY] RGB565 색상 상수. Phase 5 이후 mono on/off API만 사용하므로 실제 참조되지 않음. */
 #define BATTERYDISPLAY_TEXT_COLOR     0xFFFFU
-/* 논리 좌표 기준입니다. (0,0)은 표시 영역의 왼쪽 위) */
-#define BATTERYDISPLAY_TEXT_X         3U    /* 기존 패널 좌표 24를 논리 좌표 3으로 보정 */
-#define BATTERYDISPLAY_MARK_X         59U   /* 기존 패널 좌표 80을 논리 좌표 59로 보정 */
-#define BATTERYDISPLAY_LINE0_Y        16U   /* 기존 패널 좌표 18을 논리 좌표 16으로 보정 */
-#define BATTERYDISPLAY_LINE_STEP      7U
+/* Phase 6: mono dot 좌표 기준 (좌상단 (0,0)).
+ *   기존 logical x → mono x = logical * 3 (subpixel 단위 확장).
+ *     TEXT_X 3 → 9, MARK_X 59 → 177.
+ *   y는 1:1 (LINE0_Y=16, LINE_STEP=7 그대로 사용). */
+#define BATTERYDISPLAY_TEXT_X         9U     /* 기존 logical 3 → mono 9 */
+#define BATTERYDISPLAY_MARK_X         177U   /* 기존 logical 59 → mono 177 */
+#define BATTERYDISPLAY_LINE0_Y        16U    /* y는 1:1 */
+#define BATTERYDISPLAY_LINE_STEP      7U     /* y는 1:1 */
 
 /* 배터리 단계별 표시 문자열 */
 static const char* battery_level_text[] = {
@@ -39,16 +43,22 @@ static void BatteryDisplay_App_RenderLevel(uint32_t level)
     return;
   }
 
-  ST7735S_Drv_Clear(0x0000U);
+  // 1) mono framebuffer를 OFF로 지운다 (Phase 6 표준 흐름). 즉시 flush 안 함.
+  ST7735S_Drv_ClearMonoBuffer(0U);
 
+  // 2) 단계별 텍스트를 framebuffer에 그린다 (즉시 flush 안 함).
   for (line_index = 0U; line_index <= BATTERY_LEVEL_HIGH; line_index++)
   {
     line_y = (uint16_t)(BATTERYDISPLAY_LINE0_Y + (line_index * BATTERYDISPLAY_LINE_STEP));
-    ST7735S_Drv_DrawString3x5(BATTERYDISPLAY_TEXT_X, line_y, battery_level_text[line_index], BATTERYDISPLAY_TEXT_COLOR, 0x0000U);
+    ST7735S_Drv_DrawString3x5(BATTERYDISPLAY_TEXT_X, line_y, battery_level_text[line_index], 1U);
   }
 
+  // 3) 현재 레벨 표시 마커 '>' 출력.
   line_y = (uint16_t)(BATTERYDISPLAY_LINE0_Y + (level * BATTERYDISPLAY_LINE_STEP));
-  ST7735S_Drv_DrawString3x5(BATTERYDISPLAY_MARK_X, line_y, ">", BATTERYDISPLAY_TEXT_COLOR, 0x0000U);
+  ST7735S_Drv_DrawString3x5(BATTERYDISPLAY_MARK_X, line_y, ">", 1U);
+
+  // 4) 한 화면 구성 완료 → LCD로 1회 송신.
+  ST7735S_Drv_FlushMono();
 }
 
 /**

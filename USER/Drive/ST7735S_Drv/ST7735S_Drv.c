@@ -2,10 +2,7 @@
 #include "User_HAL_Drv.h"
 #include "string.h"
 
-#define ST7735S_PANEL_WIDTH           128U
-#define ST7735S_PANEL_HEIGHT          97U
-#define ST7735S_RAM_OFFSET_X          0U
-#define ST7735S_RAM_OFFSET_Y          32U
+/* PANEL_WIDTH/HEIGHT, RAM_OFFSET_X/Y는 ST7735S_Drv.h 에서 정의. */
 #define ST7735S_FRAME_OFFSET_X        0U
 #define ST7735S_FRAME_OFFSET_Y        0U
 #define ST7735S_MADCTL_DEFAULT        0x08U
@@ -363,8 +360,17 @@ void ST7735S_Drv_Init(void)
 #endif
 }
 
+/* ============================================================
+ * [LEGACY] RGB565 / 4bpp 경로 구현부
+ *   - 아래 함수들(`ST7735S_Drv_WriteFrame`, `ST7735S_Drv_Clear`, `st7735s_draw_pixel`)
+ *     및 LUT(`gray_lut_565`)는 mono 리팩터 이전 호출 경로이다.
+ *   - 신규 코드는 mono 표준 흐름을 사용해야 하며, 아래 함수에 신규 호출자를 추가하지 않는다.
+ *   - 롤백 목적으로 제거 없이 보존한다.
+ * ============================================================ */
+
 /**
  * @brief  4bpp 프레임(128x97)을 LCD로 출력합니다.
+ * @note   [LEGACY] mono 경로에서는 사용하지 않음.
  * @param  frame 프레임 버퍼 포인터
  * @retval 없음
  */
@@ -442,6 +448,8 @@ void ST7735S_Drv_WriteFrame(const uint8_t *frame)
 
 /**
  * @brief  논리 좌표 기준으로 1픽셀을 출력합니다.
+ * @note   [LEGACY] RGB565 직접 픽셀 경로. mono 경로에서는 ST7735S_Drv_DrawMonoDot()를 사용한다.
+ *         현재 유일한 호출자는 ST7735S_Drv_Clear()의 코너 4점 마커이다.
  * @param  x 논리 X 좌표
  * @param  y 논리 Y 좌표
  * @param  rgb565 픽셀 색상
@@ -560,102 +568,61 @@ static const uint8_t *st7735s_get_glyph_3x5(char ch)
 }
 
 /**
- * @brief  3x5 글자 1개를 출력합니다.
- * @param  x 시작 X 좌표
- * @param  y 시작 Y 좌표
- * @param  ch 출력할 문자
- * @param  fg_rgb565 글자색
- * @param  bg_rgb565 배경색
+ * @brief  3x5 글자 1개를 mono framebuffer에 그린다. Does NOT flush.
+ * @param  mono_x 시작 X 좌표 (mono dot 단위)
+ * @param  mono_y 시작 Y 좌표 (mono dot 단위)
+ * @param  ch     출력할 문자
+ * @param  on     1=글리프 dot ON, 0=글리프 dot OFF
  * @retval 없음
+ * @note   배경 dot은 건드리지 않는다(투명). 화면 초기화는 ClearMonoBuffer()로 별도 수행.
+ *         좌표 클램프는 ST7735S_Drv_DrawMonoDot() 내부에서 1회 수행됨.
  */
-void ST7735S_Drv_DrawChar3x5(uint16_t x, uint16_t y, char ch, uint16_t fg_rgb565, uint16_t bg_rgb565)
+void ST7735S_Drv_DrawChar3x5(uint16_t mono_x, uint16_t mono_y, char ch, uint8_t on)
 {
   const uint8_t *glyph;
-  uint8_t cell_buf[4U * 5U * 2U]; /* 40 bytes: 4 cols x 5 rows x 2 bytes/pixel (RGB565) */
-  uint16_t buf_idx;
   uint16_t row;
   uint16_t col;
-  uint16_t px;
 
-  // 1) 문자 시작 좌표가 유효 범위를 벗어나면 종료합니다.
-  if ((x >= (uint16_t)ST7735S_LOGICAL_WIDTH) || (y >= (uint16_t)ST7735S_LOGICAL_HEIGHT))
-  {
-    return;
-  }
-
-  // 2) 출력할 문자 글리프 포인터를 조회합니다.
+  // 1) 출력할 문자 글리프 포인터를 조회한다.
   glyph = st7735s_get_glyph_3x5(ch);
 
-  // 3) 4x5 셀이 화면 안에 완전히 들어오면 버퍼 일괄 전송 경로를 사용합니다.
-  if ((x <= (uint16_t)(ST7735S_LOGICAL_WIDTH - 4U)) &&
-      (y <= (uint16_t)(ST7735S_LOGICAL_HEIGHT - 5U)))
+  // 2) 3x5 dot 중 글리프 비트가 켜진 dot만 framebuffer에 반영한다.
+  //    범위 체크/클램프는 DrawMonoDot 내부에서 처리한다.
+  for (row = 0U; row < 5U; row++)
   {
-    // 4) 글리프/배경 정보를 기반으로 4x5 RGB565 셀 버퍼를 구성합니다.
-    buf_idx = 0U;
-    for (row = 0U; row < 5U; row++)
+    for (col = 0U; col < 3U; col++)
     {
-      for (col = 0U; col < 4U; col++)
+      if ((glyph[col] & (uint8_t)(1U << row)) != 0U)
       {
-        px = bg_rgb565;
-        if ((col < 3U) && ((glyph[col] & (uint8_t)(1U << row)) != 0U))
-        {
-          px = fg_rgb565;
-        }
-        cell_buf[buf_idx++] = (uint8_t)(px >> 8);
-        cell_buf[buf_idx++] = (uint8_t)(px & 0xFFU);
-      }
-    }
-
-    // 5) 문자 셀 영역을 window로 잡고 한 번에 전송합니다.
-    st7735s_set_window(
-      (uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_VIEW_X_MIN + x),
-      (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_VIEW_Y_MIN + y),
-      (uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_VIEW_X_MIN + x + 3U),
-      (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_VIEW_Y_MIN + y + 4U));
-    lcd_write_cmd(0x2CU); /* RAMWR */
-    lcd_write_data(cell_buf, (uint16_t)sizeof(cell_buf));
-  }
-  else
-  {
-    // 4) 경계에 걸친 경우 픽셀 단위로 클리핑 출력합니다.
-    for (row = 0U; row < 5U; row++)
-    {
-      for (col = 0U; col < 4U; col++)
-      {
-        px = bg_rgb565;
-        if ((col < 3U) && ((glyph[col] & (uint8_t)(1U << row)) != 0U))
-        {
-          px = fg_rgb565;
-        }
-        st7735s_draw_pixel((uint16_t)(x + col), (uint16_t)(y + row), px);
+        ST7735S_Drv_DrawMonoDot((uint16_t)(mono_x + col), (uint16_t)(mono_y + row), on);
       }
     }
   }
 }
 
 /**
- * @brief  문자열을 3x5 폰트로 출력합니다.
- * @param  x 시작 X 좌표
- * @param  y 시작 Y 좌표
- * @param  text 출력할 문자열
- * @param  fg_rgb565 글자색
- * @param  bg_rgb565 배경색
+ * @brief  문자열을 3x5 폰트로 mono framebuffer에 그린다. Does NOT flush.
+ * @param  mono_x 시작 X 좌표 (mono dot 단위)
+ * @param  mono_y 시작 Y 좌표 (mono dot 단위)
+ * @param  text   출력할 문자열
+ * @param  on     1=글리프 dot ON, 0=글리프 dot OFF
  * @retval 없음
+ * @note   글자 간 cursor 전진은 4 mono dot(글리프 3 + 공백 1).
  */
-void ST7735S_Drv_DrawString3x5(uint16_t x, uint16_t y, const char *text, uint16_t fg_rgb565, uint16_t bg_rgb565)
+void ST7735S_Drv_DrawString3x5(uint16_t mono_x, uint16_t mono_y, const char *text, uint8_t on)
 {
-  uint16_t cursor_x = x;
+  uint16_t cursor_x = mono_x;
 
-  // 1) 문자열 포인터 유효성을 확인합니다.
+  // 1) 문자열 포인터 유효성을 확인한다.
   if (text == NULL)
   {
     return;
   }
 
-  // 2) 문자 단위로 출력하고 커서를 4픽셀씩 이동합니다.
+  // 2) 문자 단위로 출력하고 커서를 4 mono dot씩 이동한다.
   while (*text != '\0')
   {
-    ST7735S_Drv_DrawChar3x5(cursor_x, y, *text, fg_rgb565, bg_rgb565);
+    ST7735S_Drv_DrawChar3x5(cursor_x, mono_y, *text, on);
     cursor_x = (uint16_t)(cursor_x + 4U);
     text++;
   }
@@ -663,6 +630,8 @@ void ST7735S_Drv_DrawString3x5(uint16_t x, uint16_t y, const char *text, uint16_
 
 /**
  * @brief  패널을 지정 색상으로 클리어합니다.
+ * @note   [LEGACY] mono 경로에서는 ST7735S_Drv_ClearMonoBuffer() + ST7735S_Drv_FlushMono()로 대체.
+ *         함수 끝의 코너 4점 마커는 과거 디버그용이며 mono 경로는 이를 사용하지 않는다.
  * @param  rgb565 채울 색상
  * @retval 없음
  */
@@ -699,4 +668,399 @@ void ST7735S_Drv_Clear(uint16_t rgb565)
   st7735s_draw_pixel((uint16_t)(ST7735S_LOGICAL_WIDTH - 1U), 0U, 0xFFFFU);
   st7735s_draw_pixel(0U, (uint16_t)(ST7735S_LOGICAL_HEIGHT - 1U), 0xFFFFU);
   st7735s_draw_pixel((uint16_t)(ST7735S_LOGICAL_WIDTH - 1U), (uint16_t)(ST7735S_LOGICAL_HEIGHT - 1U), 0xFFFFU);
+}
+
+/* ============================================================
+ * Mono 1bpp Framebuffer (Phase 2)
+ *   - 외부 노출 없음. 모두 static.
+ *   - 좌표계: mono_x ∈ [0, ST7735S_MONO_WIDTH-1], mono_y ∈ [0, ST7735S_MONO_HEIGHT-1].
+ *   - 비트 packing: 한 byte는 같은 라인의 가로 인접 mono dot 8개를 담는다.
+ *       byte_index = mono_y * (MONO_WIDTH / 8) + (mono_x / 8)
+ *       bit_mask   = 0x80 >> (mono_x % 8)   (MSB가 왼쪽 dot)
+ *   - 범위를 벗어난 좌표는 set/get 모두 무시(get은 0 반환). 방어용.
+ * ============================================================ */
+
+#define ST7735S_MONO_FB_STRIDE_BYTES   (ST7735S_MONO_WIDTH / 8U)   /* 32 byte/line */
+
+static uint8_t s_mono_fb[ST7735S_MONO_FRAME_BYTES];
+
+/* ============================================================
+ * Mono Dirty Line Bitmap (Phase 8)
+ *   - 1 bit / mono_y line. set = framebuffer 변경됨, flush 대상.
+ *   - mono_y 는 컨트롤러 픽셀 ctrl_y 와 1:1 (Phase 0/1 확정).
+ *   - byte_index = mono_y / 8, bit_mask = 1 << (mono_y % 8).
+ *   - flush 시 요청 범위 내 연속 dirty span 단위로 set_window+RAMWR+송신
+ *     를 분할 수행 (RAMWR 커서는 자동 진행 특성상 clean line을 단순 skip할 수 없음).
+ *   - 철칙: framebuffer 변경 진입점(`mono_fb_clear`, `mono_fb_set_dot`)이 dirty 마킹 책임.
+ * ============================================================ */
+
+#define ST7735S_MONO_DIRTY_BYTES   ((ST7735S_MONO_HEIGHT + 7U) / 8U)   /* 12 byte */
+
+static uint8_t s_mono_dirty[ST7735S_MONO_DIRTY_BYTES];
+
+/* dirty bitmap 헬퍼. mono_y 범위 체크 포함. */
+static void mono_dirty_set_all(void)
+{
+  (void)memset(s_mono_dirty, 0xFFU, sizeof(s_mono_dirty));
+}
+
+static void mono_dirty_mark_line(uint16_t mono_y)
+{
+  if (mono_y >= ST7735S_MONO_HEIGHT)
+  {
+    return;
+  }
+  s_mono_dirty[mono_y >> 3] |= (uint8_t)(1U << ((uint32_t)mono_y & 7U));
+}
+
+static void mono_dirty_clear_line(uint16_t mono_y)
+{
+  if (mono_y >= ST7735S_MONO_HEIGHT)
+  {
+    return;
+  }
+  s_mono_dirty[mono_y >> 3] &= (uint8_t)(~(uint8_t)(1U << ((uint32_t)mono_y & 7U)));
+}
+
+static uint8_t mono_dirty_is_set(uint16_t mono_y)
+{
+  if (mono_y >= ST7735S_MONO_HEIGHT)
+  {
+    return 0U;
+  }
+  return ((s_mono_dirty[mono_y >> 3] & (uint8_t)(1U << ((uint32_t)mono_y & 7U))) != 0U) ? 1U : 0U;
+}
+
+/**
+ * @brief  framebuffer 전체를 on/off로 채웁니다.
+ * @param  on 0이면 모두 OFF(0x00), 0이 아니면 모두 ON(0xFF).
+ */
+static void mono_fb_clear(uint8_t on)
+{
+  // 1) on/off 한 byte 패턴을 만들어 한 번에 메모리 채움.
+  uint8_t fill = (on != 0U) ? 0xFFU : 0x00U;
+  (void)memset(s_mono_fb, fill, sizeof(s_mono_fb));
+
+  // 2) 전 라인 dirty 마킹. (전체 재송신 보장)
+  mono_dirty_set_all();
+}
+
+/**
+ * @brief  framebuffer의 단일 mono dot을 on/off로 설정합니다.
+ * @param  mono_x [0, ST7735S_MONO_WIDTH-1]
+ * @param  mono_y [0, ST7735S_MONO_HEIGHT-1]
+ * @param  on     0이면 OFF, 0이 아니면 ON.
+ * @note   범위를 벗어나면 무시합니다. (방어적 처리)
+ */
+static void mono_fb_set_dot(uint16_t mono_x, uint16_t mono_y, uint8_t on)
+{
+  uint32_t byte_index;
+  uint8_t  bit_mask;
+
+  // 1) 범위 밖 좌표는 무시.
+  if ((mono_x >= ST7735S_MONO_WIDTH) || (mono_y >= ST7735S_MONO_HEIGHT))
+  {
+    return;
+  }
+
+  // 2) 좌표 → byte index, bit mask (MSB가 가로 왼쪽).
+  byte_index = ((uint32_t)mono_y * ST7735S_MONO_FB_STRIDE_BYTES) + ((uint32_t)mono_x / 8U);
+  bit_mask   = (uint8_t)(0x80U >> ((uint32_t)mono_x & 7U));
+
+  // 3) on/off 비트 갱신.
+  if (on != 0U)
+  {
+    s_mono_fb[byte_index] |= bit_mask;
+  }
+  else
+  {
+    s_mono_fb[byte_index] &= (uint8_t)(~bit_mask);
+  }
+
+  // 4) 해당 mono_y 라인 dirty 마킹. (실제 비트 변화 여부와 무관하게 set — 단순/안전)
+  mono_dirty_mark_line(mono_y);
+}
+
+/**
+ * @brief  framebuffer의 단일 mono dot 상태를 읽어 반환합니다.
+ * @param  mono_x [0, ST7735S_MONO_WIDTH-1]
+ * @param  mono_y [0, ST7735S_MONO_HEIGHT-1]
+ * @retval 1 = ON, 0 = OFF (범위 밖이면 0).
+ */
+static uint8_t mono_fb_get_dot(uint16_t mono_x, uint16_t mono_y)
+{
+  uint32_t byte_index;
+  uint8_t  bit_mask;
+
+  // 1) 범위 밖 좌표는 OFF로 간주.
+  if ((mono_x >= ST7735S_MONO_WIDTH) || (mono_y >= ST7735S_MONO_HEIGHT))
+  {
+    return 0U;
+  }
+
+  // 2) 좌표 → byte index, bit mask.
+  byte_index = ((uint32_t)mono_y * ST7735S_MONO_FB_STRIDE_BYTES) + ((uint32_t)mono_x / 8U);
+  bit_mask   = (uint8_t)(0x80U >> ((uint32_t)mono_x & 7U));
+
+  // 3) 비트가 set이면 1 반환.
+  return ((s_mono_fb[byte_index] & bit_mask) != 0U) ? 1U : 0U;
+}
+
+/* ============================================================
+ * Mono → RGB565 Sub-pixel Packing (Phase 3)
+ *   - ST7735S 컨트롤러 픽셀 1개(=RGB565 1 word)에는
+ *     mono dot 3개(가로로 인접)가 매핑된다.
+ *   - 채널 매핑 (Phase 0 캘리브레이션 확정):
+ *       subpx 0 → B 채널 (RGB565 하위 5bit)
+ *       subpx 1 → G 채널 (RGB565 중간 6bit)
+ *       subpx 2 → R 채널 (RGB565 상위 5bit)
+ *   - 채널 매핑은 이 한 곳(매크로)에서만 정의한다.
+ *     변경 시 다른 위치를 함께 수정할 필요 없도록 단일 진실 원본을 유지한다.
+ * ============================================================ */
+
+/* RGB565 채널 풀 강도 마스크. (모노 dot이 ON일 때 해당 채널을 최대치로 켠다) */
+#define ST7735S_RGB565_R_FULL    ((uint16_t)0xF800U)   /* 상위 5bit */
+#define ST7735S_RGB565_G_FULL    ((uint16_t)0x07E0U)   /* 중간 6bit */
+#define ST7735S_RGB565_B_FULL    ((uint16_t)0x001FU)   /* 하위 5bit */
+
+/* mono 그룹 내 sub-pixel index → RGB565 풀강도 마스크. (단일 매핑 정의) */
+#define ST7735S_SUBPX_TO_CH_MASK(subpx) \
+  (((subpx) == 0U) ? ST7735S_RGB565_B_FULL : \
+   ((subpx) == 1U) ? ST7735S_RGB565_G_FULL : \
+                     ST7735S_RGB565_R_FULL)
+
+/**
+ * @brief  가로로 인접한 mono dot 3개의 on/off 상태를 RGB565 한 픽셀로 packing 한다.
+ * @param  sub0_on  mono_x % 3 == 0 위치 dot의 on/off (0=OFF, !=0=ON) → B 채널
+ * @param  sub1_on  mono_x % 3 == 1 위치 dot의 on/off                 → G 채널
+ * @param  sub2_on  mono_x % 3 == 2 위치 dot의 on/off                 → R 채널
+ * @retval RGB565 (uint16_t) packing 결과.
+ *
+ * @note   세 dot 모두 ON 이면 0xFFFF(흰색),
+ *         세 dot 모두 OFF 이면 0x0000(검정)이 된다.
+ *         단일 채널만 ON이면 그 채널 풀 강도 값이 그대로 반환된다.
+ */
+static uint16_t mono3_to_rgb565(uint8_t sub0_on, uint8_t sub1_on, uint8_t sub2_on)
+{
+  uint16_t pixel = 0U;
+
+  // 1) sub-pixel 0 → B 채널.
+  if (sub0_on != 0U)
+  {
+    pixel |= ST7735S_SUBPX_TO_CH_MASK(0U);
+  }
+
+  // 2) sub-pixel 1 → G 채널.
+  if (sub1_on != 0U)
+  {
+    pixel |= ST7735S_SUBPX_TO_CH_MASK(1U);
+  }
+
+  // 3) sub-pixel 2 → R 채널.
+  if (sub2_on != 0U)
+  {
+    pixel |= ST7735S_SUBPX_TO_CH_MASK(2U);
+  }
+
+  return pixel;
+}
+
+/* ============================================================
+ * Mono 256x96 Public API (Phase 4)
+ *   - 좌표계: mono_x ∈ [0, ST7735S_MONO_USABLE_WIDTH-1],
+ *             mono_y ∈ [0, ST7735S_MONO_USABLE_HEIGHT-1].
+ *   - 4단계 변환:
+ *       rel_ctrl_x = mono_x / 3
+ *       rel_ctrl_y = mono_y
+ *       ram_x      = RAM_OFFSET_X + VIEW_X_MIN + rel_ctrl_x
+ *       ram_y      = RAM_OFFSET_Y + VIEW_Y_MIN + rel_ctrl_y
+ *   - 범위 클램프는 mono 좌표 진입 시점에서 1회만 수행한다(이중 적용 금지).
+ * ============================================================ */
+
+/* 한 컨트롤러 line 의 RGB565 송신 바이트 수.
+ *   컨트롤러 픽셀 수 = ST7735S_LOGICAL_WIDTH (=86), 픽셀당 2 byte → 172 byte. */
+#define ST7735S_MONO_LINE_TX_BYTES   ((uint16_t)(ST7735S_LOGICAL_WIDTH * 2U))
+
+/**
+ * @brief  framebuffer 1 line 을 RGB565 송신 바이트열로 펼친다.
+ * @param  mono_y   원본 라인 (mono 좌표).
+ * @param  ctrl_x_start  시작 컨트롤러 픽셀 인덱스(상대, 0..ST7735S_LOGICAL_WIDTH-1).
+ * @param  ctrl_x_count  송신할 컨트롤러 픽셀 수.
+ * @param  out_buf  출력 버퍼 (크기 >= ctrl_x_count*2).
+ *
+ * 한 컨트롤러 픽셀 = mono dot 3개 → mono3_to_rgb565()로 packing.
+ * mono_x = ctrl_x*3 + (0,1,2). 범위 밖 mono_x는 mono_fb_get_dot()이 0 반환 → 무해.
+ */
+static void mono_pack_line_to_tx(uint16_t mono_y,
+                                 uint16_t ctrl_x_start,
+                                 uint16_t ctrl_x_count,
+                                 uint8_t  *out_buf)
+{
+  uint16_t i;
+  uint16_t ctrl_x;
+  uint16_t mono_x_base;
+  uint8_t  s0;
+  uint8_t  s1;
+  uint8_t  s2;
+  uint16_t px;
+  uint16_t out_idx = 0U;
+
+  // 1) 컨트롤러 픽셀 단위로 진행하며 mono dot 3개 → RGB565 packing.
+  for (i = 0U; i < ctrl_x_count; i++)
+  {
+    ctrl_x      = (uint16_t)(ctrl_x_start + i);
+    mono_x_base = (uint16_t)(ctrl_x * 3U);
+
+    s0 = mono_fb_get_dot((uint16_t)(mono_x_base + 0U), mono_y);
+    s1 = mono_fb_get_dot((uint16_t)(mono_x_base + 1U), mono_y);
+    s2 = mono_fb_get_dot((uint16_t)(mono_x_base + 2U), mono_y);
+
+    px = mono3_to_rgb565(s0, s1, s2);
+
+    // 2) 빅엔디안(상위 byte 먼저) 송신 포맷.
+    out_buf[out_idx++] = (uint8_t)(px >> 8);
+    out_buf[out_idx++] = (uint8_t)(px & 0xFFU);
+  }
+}
+
+/**
+ * @brief  컨트롤러 픽셀 사각 영역을 framebuffer 내용으로 송신.
+ * @param  ctrl_x0/y0  좌상 컨트롤러 픽셀 (상대, 즉 [0, LOGICAL_WIDTH/HEIGHT) 범위).
+ * @param  ctrl_x1/y1  우하 포함 좌표.
+ *
+ * ram 좌표 = RAM_OFFSET + VIEW_MIN + 상대 컨트롤러 픽셀. (4단계 변환의 마지막 단계)
+ */
+static void mono_flush_ctrl_rect(uint16_t ctrl_x0, uint16_t ctrl_y0,
+                                 uint16_t ctrl_x1, uint16_t ctrl_y1)
+{
+  uint8_t  tx_line[ST7735S_MONO_LINE_TX_BYTES];   /* 172 byte */
+  uint16_t ctrl_x_count;
+  uint16_t ram_x_start;
+  uint16_t ram_x_end;
+  uint16_t tx_bytes;
+  uint16_t y;
+
+  // 1) 컨트롤러 픽셀 → RAM X 범위(4단계 변환의 마지막 단계). Y는 dirty span에서 결정.
+  ctrl_x_count = (uint16_t)(ctrl_x1 - ctrl_x0 + 1U);
+  ram_x_start  = (uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_VIEW_X_MIN + ctrl_x0);
+  ram_x_end    = (uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_VIEW_X_MIN + ctrl_x1);
+  tx_bytes     = (uint16_t)(ctrl_x_count * 2U);
+
+  // 2) 요청 범위 내에서 연속 dirty span 을 찾아 span 단위로 송신.
+  //    RAMWR 이 자동 진행하므로 clean line 을 중간에 상태대로 skip 할 수 없음 → span 분할.
+  y = ctrl_y0;
+  while (y <= ctrl_y1)
+  {
+    uint16_t span_y0;
+    uint16_t span_y1;
+    uint16_t ram_y_start;
+    uint16_t ram_y_end;
+    uint16_t yy;
+
+    // 2-1) clean line 는 skip.
+    if (mono_dirty_is_set(y) == 0U)
+    {
+      y++;
+      continue;
+    }
+
+    // 2-2) 연속 dirty span 확장.
+    span_y0 = y;
+    while ((y <= ctrl_y1) && (mono_dirty_is_set(y) != 0U))
+    {
+      y++;
+    }
+    span_y1 = (uint16_t)(y - 1U);
+
+    // 2-3) span 원도우 설정 + RAMWR.
+    ram_y_start = (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_VIEW_Y_MIN + span_y0);
+    ram_y_end   = (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_VIEW_Y_MIN + span_y1);
+
+    st7735s_set_window(ram_x_start, ram_y_start, ram_x_end, ram_y_end);
+    lcd_write_cmd(0x2CU); /* RAMWR */
+
+    // 2-4) span 내 각 라인 packing → SPI burst. CS는 span 동안 유지.
+    HW_LCD_DC_Set(1U);
+    lcd_select(1U);
+    for (yy = span_y0; yy <= span_y1; yy++)
+    {
+      mono_pack_line_to_tx(yy, ctrl_x0, ctrl_x_count, tx_line);
+      (void)HAL_SPI_Transmit(lcd_get_spi_handle(), tx_line, tx_bytes, HAL_MAX_DELAY);
+      mono_dirty_clear_line(yy);
+    }
+    lcd_select(0U);
+  }
+}
+
+/* ---------- Public API ---------- */
+
+void ST7735S_Drv_ClearMonoBuffer(uint8_t on)
+{
+  // 1) framebuffer만 채움. flush 하지 않음.
+  mono_fb_clear(on);
+}
+
+void ST7735S_Drv_DrawMonoDot(uint16_t mono_x, uint16_t mono_y, uint8_t on)
+{
+  // 1) 사용 가능 영역(MONO_USABLE_*) 밖은 무시. (mono 진입 시점 클램프 1회)
+  if ((mono_x >= ST7735S_MONO_USABLE_WIDTH) || (mono_y >= ST7735S_MONO_USABLE_HEIGHT))
+  {
+    return;
+  }
+
+  // 2) framebuffer 1 dot 갱신. flush 하지 않음.
+  mono_fb_set_dot(mono_x, mono_y, on);
+}
+
+void ST7735S_Drv_FlushMono(void)
+{
+  // 1) 전체 컨트롤러 픽셀 사각형(상대 좌표)을 한 번에 송신.
+  mono_flush_ctrl_rect(0U, 0U,
+                       (uint16_t)(ST7735S_LOGICAL_WIDTH  - 1U),
+                       (uint16_t)(ST7735S_LOGICAL_HEIGHT - 1U));
+}
+
+void ST7735S_Drv_ClearMono(uint8_t on)
+{
+  // 1) framebuffer 채움.
+  mono_fb_clear(on);
+  // 2) 즉시 전체 송신. (테스트/디버그/긴급 전용. 일반 화면 구성에는 ClearMonoBuffer 사용)
+  ST7735S_Drv_FlushMono();
+}
+
+void ST7735S_Drv_FlushMonoRect(uint16_t mono_x0, uint16_t mono_y0,
+                               uint16_t mono_x1, uint16_t mono_y1)
+{
+  uint16_t mx0;
+  uint16_t my0;
+  uint16_t mx1;
+  uint16_t my1;
+  uint16_t ctrl_x0;
+  uint16_t ctrl_x1;
+
+  // 1) 좌표 정규화 (start <= end).
+  if (mono_x0 <= mono_x1) { mx0 = mono_x0; mx1 = mono_x1; }
+  else                    { mx0 = mono_x1; mx1 = mono_x0; }
+
+  if (mono_y0 <= mono_y1) { my0 = mono_y0; my1 = mono_y1; }
+  else                    { my0 = mono_y1; my1 = mono_y0; }
+
+  // 2) 사용 가능 영역 클램프.
+  if (mx1 >= ST7735S_MONO_USABLE_WIDTH)  { mx1 = (uint16_t)(ST7735S_MONO_USABLE_WIDTH  - 1U); }
+  if (my1 >= ST7735S_MONO_USABLE_HEIGHT) { my1 = (uint16_t)(ST7735S_MONO_USABLE_HEIGHT - 1U); }
+  if (mx0 >= ST7735S_MONO_USABLE_WIDTH)  { return; }   /* 영역 자체가 화면 밖 */
+  if (my0 >= ST7735S_MONO_USABLE_HEIGHT) { return; }
+
+  // 3) mono → 컨트롤러 픽셀 경계 정렬.
+  //    좌측: 같은 컨트롤러 픽셀의 모든 서브픽셀이 함께 송신되어야 하므로 내림.
+  //    우측: 마지막 mono dot을 포함하는 컨트롤러 픽셀까지 송신되도록 올림.
+  ctrl_x0 = (uint16_t)(mx0 / 3U);
+  ctrl_x1 = (uint16_t)(mx1 / 3U);
+  if (ctrl_x1 >= ST7735S_LOGICAL_WIDTH)
+  {
+    ctrl_x1 = (uint16_t)(ST7735S_LOGICAL_WIDTH - 1U);
+  }
+
+  // 4) 컨트롤러 픽셀 사각형으로 송신 위임. (세로는 1:1)
+  mono_flush_ctrl_rect(ctrl_x0, my0, ctrl_x1, my1);
 }

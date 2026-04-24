@@ -6,8 +6,17 @@
 #include "App/PowerManager_App/PowerManager_Interface.h"
 #include "App/SequenceManager_App/SequenceManager_Interface.h"
 
+/* [LEGACY] RGB565 색상 상수. Phase 5 이후 mono on/off API만 사용하므로 실제 참조되지 않음. */
 #define SCREEN_BG_COLOR              0x0000U
 #define SCREEN_TEXT_COLOR            0xFFFFU
+
+/* Phase 6: mono dot 좌표 기준.
+ *   기존 logical 좌표 (2, 2) → mono (2*3, 2) = (6, 2).
+ *   기존 logical 좌표 (2, 12) → mono (6, 12).
+ *   mono_x 범위: 0..255, mono_y 범위: 0..95. */
+#define SCREEN_TEXT_X                6U    /* 기존 logical 2 → mono 6 */
+#define SCREEN_TEXT_Y                2U    /* y는 1:1 */
+#define SCREEN_BAT_LOW_Y             12U   /* y는 1:1 */
 #define SCREEN_BOOT_HOLD_MS          600U
 #define SCREEN_CMD_QUEUE_SIZE        8U
 
@@ -221,37 +230,78 @@ static void ScreenManager_RenderIfNeeded(void)
     return;
   }
 
-  // 2) 새 장면을 그리기 전에 화면을 먼저 지웁니다.
-  ST7735S_Drv_Clear(SCREEN_BG_COLOR);
+  // 2) 새 장면을 그리기 전에 mono framebuffer를 OFF로 지웁니다 (Phase 6 표준 흐름).
+  //    즉시 flush 하지 않고, 함수 끝의 FlushMono()에서 1회만 송신하여 깜박임 방지.
+  ST7735S_Drv_ClearMonoBuffer(0U);
 
   // 3) 현재 화면 상태에 맞는 기본 문자열을 출력합니다.
   if (s_state == SCREENMANAGER_STATE_BOOT)
   {
-    ST7735S_Drv_DrawString3x5(2U, 2U, "INCLIX BOOT", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+#if 0 /* PHASE4_TEST: 빌드 후 육안 확인하면 #if 0 으로 바꾸거나 블록 통째로 삭제 */
+    /* ===== Phase 4 검증 임시 코드 (1순위: 십자선 두께 비교) ===========
+     *  목적: 가로 1 dot vs 세로 1 dot 굵기가 같은지 확인.
+     *        세로선과 가로선 굵기가 같으면 → mono 1 dot 정확히 출력 중.
+     *        가로선만 3배 두꺼우면 → packing 미적용 (불합격).
+     *  표준 흐름: ClearMonoBuffer → DrawMonoDot... → FlushMono.
+     *  관찰 후 BOOT→STANDBY 전환을 막기 위해 while(1)로 정지.
+     * ============================================================= */
+    {
+      uint16_t i;
+
+      ST7735S_Drv_ClearMonoBuffer(0U);
+
+      // 1) 세로선: x=128 고정, y=10..85 (76 dot 두께 1)
+      for (i = 10U; i < 86U; i++)
+      {
+        ST7735S_Drv_DrawMonoDot(128U, i, 1U);
+      }
+      // 2) 가로선: y=48 고정, x=10..245 (236 dot 두께 1)
+      for (i = 10U; i < 246U; i++)
+      {
+        ST7735S_Drv_DrawMonoDot(i, 48U, 1U);
+      }
+      // 3) 모서리 4점: VIEW 범위 정확성 검증.
+      ST7735S_Drv_DrawMonoDot(0U,   0U,  1U);
+      ST7735S_Drv_DrawMonoDot(255U, 0U,  1U);
+      ST7735S_Drv_DrawMonoDot(0U,   95U, 1U);
+      ST7735S_Drv_DrawMonoDot(255U, 95U, 1U);
+
+      // 4) 한 번에 송신.
+      ST7735S_Drv_FlushMono();
+
+      // 5) 다른 화면이 덮어쓰지 않도록 정지. (전원 차단 후 USB 재연결로 정상 복귀)
+      while (1)
+      {
+        /* 관찰 대기 */
+      }
+    }
+#else
+    ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_TEXT_Y, "INCLIX BOOT", 1U);
+#endif
   }
   else if (s_state == SCREENMANAGER_STATE_STANDBY)
   {
-    ST7735S_Drv_DrawString3x5(2U, 2U, "INCLIX STANDBY", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+    ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_TEXT_Y, "INCLIX STANDBY", 1U);
   }
   else if (s_state == SCREENMANAGER_STATE_WAIT_CODECHIP)
   {
-    ST7735S_Drv_DrawString3x5(2U, 2U, "INSERT CODECHIP", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+    ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_TEXT_Y, "INSERT CODECHIP", 1U);
   }
   else if (s_state == SCREENMANAGER_STATE_WAIT_CASSETTE)
   {
-    ST7735S_Drv_DrawString3x5(2U, 2U, "INSERT CASSETTE", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+    ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_TEXT_Y, "INSERT CASSETTE", 1U);
   }
   else if (s_state == SCREENMANAGER_STATE_MEASURING)
   {
-    ST7735S_Drv_DrawString3x5(2U, 2U, "MEASURING...", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+    ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_TEXT_Y, "MEASURING...", 1U);
   }
   else if (s_state == SCREENMANAGER_STATE_CALCULATING)
   {
-    ST7735S_Drv_DrawString3x5(2U, 2U, "CALCULATING...", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+    ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_TEXT_Y, "CALCULATING...", 1U);
   }
   else if (s_state == SCREENMANAGER_STATE_RESULT_DISPLAY)
   {
-    ST7735S_Drv_DrawString3x5(2U, 2U, "RESULT READY", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+    ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_TEXT_Y, "RESULT READY", 1U);
   }
   else if (s_state == SCREENMANAGER_STATE_SLEEP)
   {
@@ -263,7 +313,7 @@ static void ScreenManager_RenderIfNeeded(void)
   }
   else if (s_state == SCREENMANAGER_STATE_POWER_OFF_NOTICE)
   {
-    ST7735S_Drv_DrawString3x5(2U, 2U, "TURNING OFF...", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+    ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_TEXT_Y, "TURNING OFF...", 1U);
   }
   else
   {
@@ -275,10 +325,13 @@ static void ScreenManager_RenderIfNeeded(void)
       (PowerManager_Interface_GetContext(&pm_ctx) == 0) &&
       (pm_ctx.battery_low_latched != 0U))
   {
-    ST7735S_Drv_DrawString3x5(2U, 12U, "BAT LOW", SCREEN_TEXT_COLOR, SCREEN_BG_COLOR);
+    ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_BAT_LOW_Y, "BAT LOW", 1U);
   }
 
-  // 5) redraw를 끝냈으므로 요청 플래그를 내립니다.
+  // 5) 구성된 framebuffer를 LCD로 1회에 송신합니다 (Phase 6 표준 흐름의 마지막 단계).
+  ST7735S_Drv_FlushMono();
+
+  // 6) redraw를 끝냈으므로 요청 플래그를 내립니다.
   s_need_redraw = 0U;
 }
 
