@@ -3,11 +3,6 @@
 
 #include "main.h"
 
-/* [LEGACY] 4bpp 경로용 입력 프레임 크기. mono 경로에서는 사용하지 않음. */
-#define ST7735S_DRV_WIDTH            128U
-#define ST7735S_DRV_HEIGHT           97U
-#define ST7735S_DRV_FRAME_BYTES      ((ST7735S_DRV_WIDTH * ST7735S_DRV_HEIGHT) / 2U)
-
 /* LCD 실제 패널 크기(컨트롤러 기준). Init 단계의 panel-wide clear/tuning에 사용됨. */
 #define ST7735S_PANEL_WIDTH          128U
 #define ST7735S_PANEL_HEIGHT         97U
@@ -127,21 +122,5 @@ void ST7735S_Drv_FlushMono(void);
  */
 void ST7735S_Drv_FlushMonoRect(uint16_t mono_x0, uint16_t mono_y0,
                                uint16_t mono_x1, uint16_t mono_y1);
-
-/* ============================================================
- * [LEGACY] RGB565 / 4bpp 경로 (mono 리팩터 이후 신규 호출자 금지)
- *   - 아래 함수들은 mono 표준 흐름(`ClearMonoBuffer → Draw* → FlushMono`)
- *     도입 이전에 사용되던 경로이며, 공식으로 **사용 금지**이다.
- *   - 롤백 용도로만 보존하며, App 신규 코드에서는 호출하지 않는다.
- *   - 관련 매크로: ST7735S_DRV_WIDTH/HEIGHT/FRAME_BYTES (4bpp 입력 구조 전용).
- * ============================================================ */
-
-/* [LEGACY] 4bpp 프레임 출력 (입력 버퍼 크기: ST7735S_DRV_FRAME_BYTES = 6272 bytes).
- *          mono 경로에서는 사용하지 않음. */
-void ST7735S_Drv_WriteFrame(const uint8_t *frame);
-
-/* [LEGACY] 패널 전체를 지정 RGB565 색으로 채움.
- *          mono 경로에서는 ST7735S_Drv_ClearMonoBuffer() + ST7735S_Drv_FlushMono()로 대체. */
-void ST7735S_Drv_Clear(uint16_t rgb565);
 
 #endif /* __ST7735S_DRV_H__ */

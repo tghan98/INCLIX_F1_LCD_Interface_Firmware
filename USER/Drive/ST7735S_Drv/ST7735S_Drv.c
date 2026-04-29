@@ -3,8 +3,6 @@
 #include "string.h"
 
 /* PANEL_WIDTH/HEIGHT, RAM_OFFSET_X/Y는 ST7735S_Drv.h 에서 정의. */
-#define ST7735S_FRAME_OFFSET_X        0U
-#define ST7735S_FRAME_OFFSET_Y        0U
 #define ST7735S_MADCTL_DEFAULT        0x08U
 #define ST7735S_COLMOD_RGB565         0x05U
 #define ST7735S_TUNING_PATTERN_MODE   0U
@@ -360,124 +358,6 @@ void ST7735S_Drv_Init(void)
 #endif
 }
 
-/* ============================================================
- * [LEGACY] RGB565 / 4bpp 경로 구현부
- *   - 아래 함수들(`ST7735S_Drv_WriteFrame`, `ST7735S_Drv_Clear`, `st7735s_draw_pixel`)
- *     및 LUT(`gray_lut_565`)는 mono 리팩터 이전 호출 경로이다.
- *   - 신규 코드는 mono 표준 흐름을 사용해야 하며, 아래 함수에 신규 호출자를 추가하지 않는다.
- *   - 롤백 목적으로 제거 없이 보존한다.
- * ============================================================ */
-
-/**
- * @brief  4bpp 프레임(128x97)을 LCD로 출력합니다.
- * @note   [LEGACY] mono 경로에서는 사용하지 않음.
- * @param  frame 프레임 버퍼 포인터
- * @retval 없음
- */
-void ST7735S_Drv_WriteFrame(const uint8_t *frame)
-{
-#if (ST7735S_TUNING_PATTERN_MODE != 0U)
-  (void)frame;
-  st7735s_draw_tuning_pattern();
-  return;
-#else
-  static const uint16_t gray_lut_565[16] =
-  {
-    0x0000U, 0x1082U, 0x2104U, 0x3186U,
-    0x4208U, 0x52AAU, 0x632CU, 0x73AEU,
-    0x8C51U, 0x9CD3U, 0xAD55U, 0xBDD7U,
-    0xCE79U, 0xDEFBU, 0xEF7DU, 0xFFFFU
-  };
-  uint8_t tx_line[(uint16_t)(ST7735S_PANEL_WIDTH * 2U)];
-  uint32_t y;
-  uint32_t x;
-
-  // 1) 입력 프레임 포인터 유효성을 확인합니다.
-  if (frame == NULL)
-  {
-    return;
-  }
-
-  // 2) 프레임 출력 영역을 윈도우로 설정하고 RAM 쓰기를 시작합니다.
-  st7735s_set_window((uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_FRAME_OFFSET_X),
-                     (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_FRAME_OFFSET_Y),
-                     (uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_FRAME_OFFSET_X + ST7735S_PANEL_WIDTH - 1U),
-                     (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_FRAME_OFFSET_Y + ST7735S_DRV_HEIGHT - 1U));
-  lcd_write_cmd(0x2CU); /* RAMWR */
-
-  // 3) 각 라인을 4bpp -> RGB565로 변환하여 전송 버퍼를 구성합니다.
-  HW_LCD_DC_Set(1U);
-  lcd_select(1U);
-  for (y = 0U; y < ST7735S_DRV_HEIGHT; y++)
-  {
-    const uint8_t *src_line;
-    uint32_t src_x;
-    uint32_t dst_idx;
-
-    src_line = &frame[y * (ST7735S_DRV_WIDTH / 2U)];
-    src_x = 0U;
-    dst_idx = 0U;
-
-    for (x = 0U; x < (ST7735S_DRV_WIDTH / 2U); x++)
-    {
-      uint8_t packed;
-      uint8_t gray_left;
-      uint8_t gray_right;
-      uint16_t px_left;
-      uint16_t px_right;
-
-      packed = src_line[src_x++];
-      gray_left = (uint8_t)((packed >> 4) & 0x0FU);
-      gray_right = (uint8_t)(packed & 0x0FU);
-      px_left = gray_lut_565[gray_left];
-      px_right = gray_lut_565[gray_right];
-
-      tx_line[dst_idx++] = (uint8_t)(px_left >> 8);
-      tx_line[dst_idx++] = (uint8_t)(px_left & 0xFFU);
-
-      tx_line[dst_idx++] = (uint8_t)(px_right >> 8);
-      tx_line[dst_idx++] = (uint8_t)(px_right & 0xFFU);
-    }
-
-    // 4) 변환된 한 줄 데이터를 SPI로 전송합니다.
-    (void)HAL_SPI_Transmit(lcd_get_spi_handle(), tx_line, (uint16_t)sizeof(tx_line), HAL_MAX_DELAY);
-  }
-  lcd_select(0U);
-#endif
-}
-
-/**
- * @brief  논리 좌표 기준으로 1픽셀을 출력합니다.
- * @note   [LEGACY] RGB565 직접 픽셀 경로. mono 경로에서는 ST7735S_Drv_DrawMonoDot()를 사용한다.
- *         현재 유일한 호출자는 ST7735S_Drv_Clear()의 코너 4점 마커이다.
- * @param  x 논리 X 좌표
- * @param  y 논리 Y 좌표
- * @param  rgb565 픽셀 색상
- * @retval 없음
- */
-static void st7735s_draw_pixel(uint16_t x, uint16_t y, uint16_t rgb565)
-{
-  uint8_t px[2];
-
-  // 1) 논리 좌표가 유효 범위를 벗어나면 즉시 종료합니다.
-  if ((x >= (uint16_t)ST7735S_LOGICAL_WIDTH) || (y >= (uint16_t)ST7735S_LOGICAL_HEIGHT))
-  {
-    return;
-  }
-
-  // 2) 논리 좌표를 실제 RAM 좌표로 변환해 1픽셀 윈도우를 설정합니다.
-  st7735s_set_window((uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_VIEW_X_MIN + x),
-                     (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_VIEW_Y_MIN + y),
-                     (uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_VIEW_X_MIN + x),
-                     (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_VIEW_Y_MIN + y));
-  lcd_write_cmd(0x2CU); /* RAMWR */
-
-  // 3) RGB565 1픽셀 데이터를 상/하위 바이트로 전송합니다.
-  px[0] = (uint8_t)(rgb565 >> 8);
-  px[1] = (uint8_t)(rgb565 & 0xFFU);
-  lcd_write_data(px, 2U);
-}
-
 /**
  * @brief  3x5 글꼴 비트맵 포인터를 반환합니다.
  * @param  ch 출력할 문자
@@ -626,48 +506,6 @@ void ST7735S_Drv_DrawString3x5(uint16_t mono_x, uint16_t mono_y, const char *tex
     cursor_x = (uint16_t)(cursor_x + 4U);
     text++;
   }
-}
-
-/**
- * @brief  패널을 지정 색상으로 클리어합니다.
- * @note   [LEGACY] mono 경로에서는 ST7735S_Drv_ClearMonoBuffer() + ST7735S_Drv_FlushMono()로 대체.
- *         함수 끝의 코너 4점 마커는 과거 디버그용이며 mono 경로는 이를 사용하지 않는다.
- * @param  rgb565 채울 색상
- * @retval 없음
- */
-void ST7735S_Drv_Clear(uint16_t rgb565)
-{
-  uint8_t line[(uint16_t)(ST7735S_PANEL_WIDTH * 2U)];
-  uint16_t y;
-  uint16_t x;
-
-  // 1) 지정 색상의 1라인 RGB565 버퍼를 생성합니다.
-  for (x = 0U; x < ST7735S_PANEL_WIDTH; x++)
-  {
-    line[2U * x] = (uint8_t)(rgb565 >> 8);
-    line[(2U * x) + 1U] = (uint8_t)(rgb565 & 0xFFU);
-  }
-
-  // 2) 전체 패널을 쓰기 윈도우로 설정하고 라인 버퍼를 반복 전송합니다.
-  st7735s_set_window((uint16_t)ST7735S_RAM_OFFSET_X,
-                     (uint16_t)ST7735S_RAM_OFFSET_Y,
-                     (uint16_t)(ST7735S_RAM_OFFSET_X + ST7735S_PANEL_WIDTH - 1U),
-                     (uint16_t)(ST7735S_RAM_OFFSET_Y + ST7735S_PANEL_HEIGHT - 1U));
-  lcd_write_cmd(0x2CU); /* RAMWR */
-
-  HW_LCD_DC_Set(1U);
-  lcd_select(1U);
-  for (y = 0U; y < ST7735S_PANEL_HEIGHT; y++)
-  {
-    (void)HAL_SPI_Transmit(lcd_get_spi_handle(), line, (uint16_t)sizeof(line), HAL_MAX_DELAY);
-  }
-  lcd_select(0U);
-
-  // 3) 코너 4점 마커를 출력해 표시 영역 경계를 확인합니다.
-  st7735s_draw_pixel(0U, 0U, 0xFFFFU);
-  st7735s_draw_pixel((uint16_t)(ST7735S_LOGICAL_WIDTH - 1U), 0U, 0xFFFFU);
-  st7735s_draw_pixel(0U, (uint16_t)(ST7735S_LOGICAL_HEIGHT - 1U), 0xFFFFU);
-  st7735s_draw_pixel((uint16_t)(ST7735S_LOGICAL_WIDTH - 1U), (uint16_t)(ST7735S_LOGICAL_HEIGHT - 1U), 0xFFFFU);
 }
 
 /* ============================================================

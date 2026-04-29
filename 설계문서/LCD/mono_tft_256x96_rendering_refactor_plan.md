@@ -25,7 +25,7 @@
 - MADCTL 값 변경(0x08 → 0x00 등)은 1차 리팩터 범위에서 제외한다. 현재 0x08을 그대로 유지한다.
 - LCD 초기화 시퀀스(FRMCTR/PWCTR/VMCTR/COLMOD 등)의 대규모 변경은 하지 않는다.
 - SPI / User_HAL / 핀 매핑 등 하드웨어 추상화 계층의 구조 개편은 하지 않는다.
-- 기존 4bpp `ST7735S_Drv_WriteFrame` 경로 삭제는 1차 범위에서 제외한다(legacy로만 분류).
+- ~~기존 4bpp `ST7735S_Drv_WriteFrame` 경로 삭제는 1차 범위에서 제외한다(legacy로만 분류).~~ → **Phase 2.9(2026-04-29)에서 legacy 경로 완전 삭제 완료.**
 
 ## Key Design
 
