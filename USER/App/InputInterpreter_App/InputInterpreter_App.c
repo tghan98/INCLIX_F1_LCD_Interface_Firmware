@@ -94,20 +94,31 @@ static int32_t InputInterpreter_DispatchToPower(const InputInterpreter_Translate
 static int32_t InputInterpreter_DispatchToAnalysis(const InputInterpreter_TranslatedCmd_t* cmd)
 {
   SequenceManager_Command_t sequence_cmd;
+  SequenceManager_State_t seq_state;
 
   if (cmd == NULL)
   {
     return -1;
   }
 
+  seq_state = SequenceManager_Interface_GetState();
+
   switch (cmd->cmd)
   {
     case INPUTINTERPRETER_CMD_ANALYSIS_START_REQUEST:
+      if (seq_state == SEQUENCEMANAGER_STATE_READY_TO_INCUBATE)
+      {
+        return 0;
+      }
       sequence_cmd = SEQUENCEMANAGER_CMD_START_REQUEST;
       break;
 
-    case INPUTINTERPRETER_CMD_CODECHIP_READY:
-      sequence_cmd = SEQUENCEMANAGER_CMD_CODECHIP_READY;
+    case INPUTINTERPRETER_CMD_CODECHIP_INSERTED:
+      sequence_cmd = SEQUENCEMANAGER_CMD_CODECHIP_INSERTED;
+      break;
+
+    case INPUTINTERPRETER_CMD_CASSETTE_INSERTED:
+      sequence_cmd = SEQUENCEMANAGER_CMD_CASSETTE_INSERTED;
       break;
 
     default:
@@ -155,6 +166,7 @@ static int32_t InputInterpreter_Dispatch(const InputInterpreter_TranslatedCmd_t*
 static void InputInterpreter_TranslateButtonEvent(const ButtonAppEvent_t* event)
 {
   InputInterpreter_TranslatedCmd_t cmd;
+  SequenceManager_State_t seq_state;
 
   if (event == NULL)
   {
@@ -168,6 +180,7 @@ static void InputInterpreter_TranslateButtonEvent(const ButtonAppEvent_t* event)
 
   memset(&cmd, 0, sizeof(cmd));
   cmd.timestamp_ms = HAL_GetTick();
+  seq_state = SequenceManager_Interface_GetState();
 
   if (event->event == BUTTON_EVENT_CLICK)
   {
@@ -175,9 +188,19 @@ static void InputInterpreter_TranslateButtonEvent(const ButtonAppEvent_t* event)
     cmd.cmd = INPUTINTERPRETER_CMD_USER_ACTIVITY;
     (void)InputInterpreter_Dispatch(&cmd);
 
-    cmd.target = INPUTINTERPRETER_TARGET_ANALYSIS;
-    cmd.cmd = INPUTINTERPRETER_CMD_ANALYSIS_START_REQUEST;
-    (void)InputInterpreter_Dispatch(&cmd);
+    if (seq_state == SEQUENCEMANAGER_STATE_WAIT_CASSETTE)
+    {
+      /* TEMP STUB: cassette hardware is not available yet, so button click becomes cassette inserted. */
+      cmd.target = INPUTINTERPRETER_TARGET_ANALYSIS;
+      cmd.cmd = INPUTINTERPRETER_CMD_CASSETTE_INSERTED;
+      (void)InputInterpreter_Dispatch(&cmd);
+    }
+    else if (seq_state != SEQUENCEMANAGER_STATE_READY_TO_INCUBATE)
+    {
+      cmd.target = INPUTINTERPRETER_TARGET_ANALYSIS;
+      cmd.cmd = INPUTINTERPRETER_CMD_ANALYSIS_START_REQUEST;
+      (void)InputInterpreter_Dispatch(&cmd);
+    }
   }
   else if (event->event == BUTTON_EVENT_PRESSED)
   {
@@ -261,7 +284,7 @@ static void InputInterpreter_TranslateCodeChipEvent(const CodeChip_AppEvent_t* e
 
   if (event->event == CODECHIP_EVENT_INSERTED)
   {
-    cmd.cmd = INPUTINTERPRETER_CMD_CODECHIP_READY;
+    cmd.cmd = INPUTINTERPRETER_CMD_CODECHIP_INSERTED;
     (void)InputInterpreter_Dispatch(&cmd);
   }
   else

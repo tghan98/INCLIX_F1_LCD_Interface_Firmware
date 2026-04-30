@@ -2,6 +2,7 @@
 
 #include "SequenceManager_App.h"
 
+#include "App/CodeChip_App/CodeChip_LotValidator.h"
 #include "App/PowerManager_App/PowerManager_Interface.h"
 
 /* SequenceManager 내부 명령 큐 최대 크기 */
@@ -19,6 +20,7 @@ typedef struct
 static SequenceManager_State_t s_state;          // 현재 검사절차 상태
 static uint32_t s_state_enter_tick;              // 현재 상태에 진입한 시각 (ms 단위)
 static uint8_t s_pending_start_request;          // 전원 복귀 후 반영할 시작 요청 보관 플래그
+static uint8_t s_lot_validation_done;            // VALIDATE_LOT 상태에서 Stub 결과 1회 처리 플래그
 static SequenceManager_CmdQueue_t s_cmd_queue;   // SequenceManager 명령 큐 인스턴스
 
 static void SequenceManager_CmdQueue_Init(void);
@@ -27,6 +29,7 @@ static int32_t SequenceManager_CmdQueue_Pop(SequenceManager_Command_t* out_cmd);
 static void SequenceManager_SetState(SequenceManager_State_t next_state);
 static uint8_t SequenceManager_IsDisplayCapableState(PowerManager_State_t power_state);
 static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd);
+static int32_t SequenceManager_RunLotValidation(void);
 
 /**
  * @brief 내부 명령 큐 인덱스와 개수를 초기화한다.
@@ -97,6 +100,12 @@ static void SequenceManager_SetState(SequenceManager_State_t next_state)
   s_state = next_state;
   // 2) 새 상태에 진입한 시각을 기록
   s_state_enter_tick = HAL_GetTick();
+
+  // 3) VALIDATE_LOT에 새로 진입할 때만 Stub 검증 1회 처리 플래그를 리셋
+  if (next_state == SEQUENCEMANAGER_STATE_VALIDATE_LOT)
+  {
+    s_lot_validation_done = 0U;
+  }
 }
 
 /**
@@ -108,6 +117,50 @@ static void SequenceManager_SetState(SequenceManager_State_t next_state)
 static uint8_t SequenceManager_IsDisplayCapableState(PowerManager_State_t power_state)
 {
   return (power_state == POWERMANAGER_STATE_STANDBY) ? 1U : 0U;
+}
+
+/**
+ * @brief VALIDATE_LOT 상태에서 LotValidator Stub를 1회 실행하고 결과 명령을 큐에 등록한다.
+ * @retval 0 처리 성공 또는 아직 처리하지 않음.
+ * @retval -1 결과 명령 큐 등록 실패.
+ */
+static int32_t SequenceManager_RunLotValidation(void)
+{
+  CodeChip_LotValidator_Result_t result;
+  SequenceManager_Command_t next_cmd;
+
+  if ((s_state != SEQUENCEMANAGER_STATE_VALIDATE_LOT) ||
+      (s_lot_validation_done != 0U))
+  {
+    return 0;
+  }
+
+  /* TODO: 실제 CodeChip read/parse 도입 시 s_state_enter_tick 기반 timeout 추가 검토 */
+  result = CodeChip_LotValidator_Validate();
+
+  switch (result)
+  {
+    case CODECHIP_LOT_VALIDATOR_RESULT_VALID:
+      next_cmd = SEQUENCEMANAGER_CMD_LOT_VALID;
+      break;
+
+    case CODECHIP_LOT_VALIDATOR_RESULT_INVALID:
+      next_cmd = SEQUENCEMANAGER_CMD_LOT_INVALID;
+      break;
+
+    case CODECHIP_LOT_VALIDATOR_RESULT_READ_FAIL:
+    default:
+      next_cmd = SEQUENCEMANAGER_CMD_LOT_READ_FAIL;
+      break;
+  }
+
+  if (SequenceManager_CmdQueue_Push(next_cmd) != 0)
+  {
+    return -1;
+  }
+
+  s_lot_validation_done = 1U;
+  return 0;
 }
 
 /**
@@ -144,19 +197,36 @@ static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd)
       }
       break;
 
-    case SEQUENCEMANAGER_CMD_CODECHIP_READY:
-      // WAIT_CODECHIP 상태이면 WAIT_CASSETTE로 전이
+    case SEQUENCEMANAGER_CMD_CODECHIP_INSERTED:
+      // WAIT_CODECHIP 상태이면 VALIDATE_LOT로 전이
       if (s_state == SEQUENCEMANAGER_STATE_WAIT_CODECHIP)
+      {
+        SequenceManager_SetState(SEQUENCEMANAGER_STATE_VALIDATE_LOT);
+      }
+      break;
+
+    case SEQUENCEMANAGER_CMD_LOT_VALID:
+      // VALIDATE_LOT 상태이면 WAIT_CASSETTE로 전이
+      if (s_state == SEQUENCEMANAGER_STATE_VALIDATE_LOT)
       {
         SequenceManager_SetState(SEQUENCEMANAGER_STATE_WAIT_CASSETTE);
       }
       break;
 
-    case SEQUENCEMANAGER_CMD_CASSETTE_READY:
-      // WAIT_CASSETTE 상태이면 MEASURING으로 전이
+    case SEQUENCEMANAGER_CMD_LOT_INVALID:
+    case SEQUENCEMANAGER_CMD_LOT_READ_FAIL:
+      // VALIDATE_LOT 상태이면 ERROR로 전이
+      if (s_state == SEQUENCEMANAGER_STATE_VALIDATE_LOT)
+      {
+        SequenceManager_SetState(SEQUENCEMANAGER_STATE_ERROR);
+      }
+      break;
+
+    case SEQUENCEMANAGER_CMD_CASSETTE_INSERTED:
+      // WAIT_CASSETTE 상태이면 READY_TO_INCUBATE로 전이
       if (s_state == SEQUENCEMANAGER_STATE_WAIT_CASSETTE)
       {
-        SequenceManager_SetState(SEQUENCEMANAGER_STATE_MEASURING);
+        SequenceManager_SetState(SEQUENCEMANAGER_STATE_READY_TO_INCUBATE);
       }
       break;
 
@@ -198,9 +268,11 @@ int32_t SequenceManager_App_Init(void)
   SequenceManager_CmdQueue_Init();
   // 2) pending 시작 요청 플래그 초기화
   s_pending_start_request = 0U;
-  // 3) 초기 상태를 IDLE로 설정
+  // 3) Lot validation 1회 처리 플래그 초기화
+  s_lot_validation_done = 0U;
+  // 4) 초기 상태를 IDLE로 설정
   s_state = SEQUENCEMANAGER_STATE_IDLE;
-  // 4) 상태 진입 시각 기록
+  // 5) 상태 진입 시각 기록
   s_state_enter_tick = HAL_GetTick();
 
   return 0;
@@ -229,6 +301,9 @@ int32_t SequenceManager_App_Run(void)
     s_pending_start_request = 0U;
     SequenceManager_SetState(SEQUENCEMANAGER_STATE_WAIT_CODECHIP);
   }
+
+  // 4) VALIDATE_LOT 상태에서는 Stub 결과를 1회만 평가해 다음 명령으로 변환
+  (void)SequenceManager_RunLotValidation();
 
   return 0;
 }

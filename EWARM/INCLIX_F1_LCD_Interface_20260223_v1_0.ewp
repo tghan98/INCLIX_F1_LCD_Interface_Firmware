@@ -1141,6 +1141,9 @@
                     <file>
                         <name>$PROJ_DIR$\..\USER\App\CodeChip_App\CodeChip_Interface.c</name>
                     </file>
+                    <file>
+                        <name>$PROJ_DIR$\..\USER\App\CodeChip_App\CodeChip_LotValidator.c</name>
+                    </file>
                 </group>
                 <group>
                     <name>InputInterpreter_App</name>
