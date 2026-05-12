@@ -4,6 +4,7 @@
 #define CODECHIP_INTERFACE_H
 
 #include "main.h"
+#include "App/AnalysisEngine_App/AnalysisEngine_Types.h"
 
 typedef enum
 {
@@ -21,6 +22,7 @@ typedef struct
 int32_t  CodeChip_Interface_Init(void);
 int32_t  CodeChip_Interface_Run(void);
 int32_t  CodeChip_Interface_GetEvent(CodeChip_AppEvent_t* event);
+int32_t  CodeChip_Interface_GetLotParam(AnalysisLotParam_t* out_lot);
 uint32_t CodeChip_Interface_GetEventCount(void);
 
 #endif /* CODECHIP_INTERFACE_H */
