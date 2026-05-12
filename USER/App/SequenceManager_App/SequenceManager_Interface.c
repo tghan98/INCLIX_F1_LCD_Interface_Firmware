@@ -22,4 +22,9 @@ SequenceManager_State_t SequenceManager_Interface_GetState(void)
   return SequenceManager_App_GetState();
 }
 
+int32_t SequenceManager_Interface_GetLastResult(const AnalysisResult_t** out_result)
+{
+  return SequenceManager_App_GetLastResult(out_result);
+}
+
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

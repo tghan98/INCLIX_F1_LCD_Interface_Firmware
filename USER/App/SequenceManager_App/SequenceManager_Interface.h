@@ -10,6 +10,7 @@ int32_t SequenceManager_Interface_Init(void);
 int32_t SequenceManager_Interface_Run(void);
 int32_t SequenceManager_Interface_SubmitCommand(SequenceManager_Command_t cmd);
 SequenceManager_State_t SequenceManager_Interface_GetState(void);
+int32_t SequenceManager_Interface_GetLastResult(const AnalysisResult_t** out_result);
 
 #endif /* SEQUENCEMANAGER_INTERFACE_H */
 

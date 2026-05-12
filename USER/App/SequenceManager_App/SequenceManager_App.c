@@ -2,11 +2,23 @@
 
 #include "SequenceManager_App.h"
 
+#include <string.h>
+
+#include "App/AnalysisEngine_App/AnalysisEngine_App.h"
+#include "App/CodeChip_App/CodeChip_Interface.h"
 #include "App/CodeChip_App/CodeChip_LotValidator.h"
 #include "App/PowerManager_App/PowerManager_Interface.h"
 
+#ifdef USE_TEST_RAW_DATA
+#include "App/AnalysisEngine_App/AnalysisEngine_TestData.h"
+#endif
+
 /* SequenceManager 내부 명령 큐 최대 크기 */
 #define SEQUENCEMANAGER_CMD_QUEUE_SIZE  8U
+
+/* Trial 1차용 상태 전이 지연 시간 */
+#define SEQUENCEMANAGER_INCUBATION_DURATION_MS  1000U
+#define SEQUENCEMANAGER_MEASURING_DURATION_MS    1000U
 
 /* SequenceManager 명령 큐 관리 구조체 */
 typedef struct
@@ -21,6 +33,10 @@ static SequenceManager_State_t s_state;          // 현재 검사절차 상태
 static uint32_t s_state_enter_tick;              // 현재 상태에 진입한 시각 (ms 단위)
 static uint8_t s_pending_start_request;          // 전원 복귀 후 반영할 시작 요청 보관 플래그
 static uint8_t s_lot_validation_done;            // VALIDATE_LOT 상태에서 Stub 결과 1회 처리 플래그
+static uint8_t s_calculation_done;               // CALCULATING 상태에서 AnalysisEngine 1회 실행 플래그
+static uint8_t s_current_lot_valid;              // VALIDATE_LOT 성공 후 LotParam 캐시 유효 여부
+static AnalysisLotParam_t s_current_lot_param;   // VALIDATE_LOT 성공 후 캐시된 LotParam
+static AnalysisResult_t s_last_result;           // 마지막 계산 결과
 static SequenceManager_CmdQueue_t s_cmd_queue;   // SequenceManager 명령 큐 인스턴스
 
 static void SequenceManager_CmdQueue_Init(void);
@@ -30,6 +46,9 @@ static void SequenceManager_SetState(SequenceManager_State_t next_state);
 static uint8_t SequenceManager_IsDisplayCapableState(PowerManager_State_t power_state);
 static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd);
 static int32_t SequenceManager_RunLotValidation(void);
+static int32_t SequenceManager_RunCalculation(void);
+static int32_t SequenceManager_CacheCurrentLotParam(void);
+static void SequenceManager_ClearLastResult(void);
 
 /**
  * @brief 내부 명령 큐 인덱스와 개수를 초기화한다.
@@ -106,6 +125,12 @@ static void SequenceManager_SetState(SequenceManager_State_t next_state)
   {
     s_lot_validation_done = 0U;
   }
+
+  // 4) CALCULATING에 새로 진입할 때만 AnalysisEngine 1회 실행 플래그를 리셋
+  if (next_state == SEQUENCEMANAGER_STATE_CALCULATING)
+  {
+    s_calculation_done = 0U;
+  }
 }
 
 /**
@@ -117,6 +142,92 @@ static void SequenceManager_SetState(SequenceManager_State_t next_state)
 static uint8_t SequenceManager_IsDisplayCapableState(PowerManager_State_t power_state)
 {
   return (power_state == POWERMANAGER_STATE_STANDBY) ? 1U : 0U;
+}
+
+/**
+ * @brief VALIDATE_LOT 성공 직후 현재 LotParam을 캐시한다.
+ * @retval 0 성공.
+ * @retval -1 LotParam 취득 실패.
+ */
+static int32_t SequenceManager_CacheCurrentLotParam(void)
+{
+  if (CodeChip_Interface_GetLotParam(&s_current_lot_param) != 0)
+  {
+    s_current_lot_valid = 0U;
+    return -1;
+  }
+
+  s_current_lot_valid = 1U;
+  return 0;
+}
+
+/**
+ * @brief 마지막 계산 결과를 초기값으로 되돌린다.
+ */
+static void SequenceManager_ClearLastResult(void)
+{
+  (void)memset(&s_last_result, 0, sizeof(s_last_result));
+}
+
+/**
+ * @brief CALCULATING 상태에서 AnalysisEngine을 1회만 실행하고 결과를 저장한다.
+ * @retval 0 처리 성공 또는 아직 처리하지 않음.
+ * @retval -1 결과 명령 큐 등록 실패 또는 입력 취득 실패.
+ */
+static int32_t SequenceManager_RunCalculation(void)
+{
+  const RawSample_t* raw = (const RawSample_t*)0;
+  uint16_t raw_count = 0U;
+  AnalysisResult_t result;
+  int32_t calc_ret;
+
+  if ((s_state != SEQUENCEMANAGER_STATE_CALCULATING) ||
+      (s_calculation_done != 0U))
+  {
+    return 0;
+  }
+
+#ifdef USE_TEST_RAW_DATA
+  if (s_current_lot_valid == 0U)
+  {
+    (void)SequenceManager_CacheCurrentLotParam();
+  }
+
+  if ((s_current_lot_valid == 0U) ||
+      (AnalysisEngine_TestData_GetRawData(&raw, &raw_count) != 0))
+  {
+    SequenceManager_ClearLastResult();
+    s_calculation_done = 1U;
+    (void)SequenceManager_CmdQueue_Push(SEQUENCEMANAGER_CMD_CALCULATION_DONE);
+    return -1;
+  }
+
+  calc_ret = AnalysisEngine_Run(&s_current_lot_param, raw, raw_count, &result);
+
+  if (calc_ret != 0)
+  {
+    SequenceManager_ClearLastResult();
+    s_calculation_done = 1U;
+    (void)SequenceManager_CmdQueue_Push(SEQUENCEMANAGER_CMD_CALCULATION_DONE);
+    return -1;
+  }
+
+  s_last_result = result;
+#else
+  SequenceManager_ClearLastResult();
+  s_calculation_done = 1U;
+  (void)SequenceManager_CmdQueue_Push(SEQUENCEMANAGER_CMD_CALCULATION_DONE);
+  return -1;
+#endif
+
+  s_calculation_done = 1U;
+
+  if (SequenceManager_CmdQueue_Push(SEQUENCEMANAGER_CMD_CALCULATION_DONE) != 0)
+  {
+    return -1;
+  }
+
+  return 0;
 }
 
 /**
@@ -197,6 +308,14 @@ static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd)
       }
       break;
 
+    case SEQUENCEMANAGER_CMD_INCUBATION_START:
+      // READY_TO_INCUBATE 상태이면 INCUBATION으로 전이
+      if (s_state == SEQUENCEMANAGER_STATE_READY_TO_INCUBATE)
+      {
+        SequenceManager_SetState(SEQUENCEMANAGER_STATE_INCUBATION);
+      }
+      break;
+
     case SEQUENCEMANAGER_CMD_CODECHIP_INSERTED:
       // WAIT_CODECHIP 상태이면 VALIDATE_LOT로 전이
       if (s_state == SEQUENCEMANAGER_STATE_WAIT_CODECHIP)
@@ -210,6 +329,7 @@ static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd)
       if (s_state == SEQUENCEMANAGER_STATE_VALIDATE_LOT)
       {
         SequenceManager_SetState(SEQUENCEMANAGER_STATE_WAIT_CASSETTE);
+        (void)SequenceManager_CacheCurrentLotParam();
       }
       break;
 
@@ -227,6 +347,14 @@ static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd)
       if (s_state == SEQUENCEMANAGER_STATE_WAIT_CASSETTE)
       {
         SequenceManager_SetState(SEQUENCEMANAGER_STATE_READY_TO_INCUBATE);
+      }
+      break;
+
+    case SEQUENCEMANAGER_CMD_MEASURE_START:
+      // INCUBATION 상태이면 MEASURING으로 전이
+      if (s_state == SEQUENCEMANAGER_STATE_INCUBATION)
+      {
+        SequenceManager_SetState(SEQUENCEMANAGER_STATE_MEASURING);
       }
       break;
 
@@ -249,6 +377,9 @@ static void SequenceManager_HandleCommand(SequenceManager_Command_t cmd)
     case SEQUENCEMANAGER_CMD_RESET:
       // pending 플래그를 해제하고 IDLE로 복귀
       s_pending_start_request = 0U;
+      s_current_lot_valid = 0U;
+      s_calculation_done = 0U;
+      SequenceManager_ClearLastResult();
       SequenceManager_SetState(SEQUENCEMANAGER_STATE_IDLE);
       break;
 
@@ -270,9 +401,15 @@ int32_t SequenceManager_App_Init(void)
   s_pending_start_request = 0U;
   // 3) Lot validation 1회 처리 플래그 초기화
   s_lot_validation_done = 0U;
-  // 4) 초기 상태를 IDLE로 설정
+  // 4) Calculation 1회 처리 플래그 초기화
+  s_calculation_done = 0U;
+  // 5) LotParam 캐시 무효화
+  s_current_lot_valid = 0U;
+  // 6) 마지막 결과 초기화
+  SequenceManager_ClearLastResult();
+  // 7) 초기 상태를 IDLE로 설정
   s_state = SEQUENCEMANAGER_STATE_IDLE;
-  // 5) 상태 진입 시각 기록
+  // 8) 상태 진입 시각 기록
   s_state_enter_tick = HAL_GetTick();
 
   return 0;
@@ -305,6 +442,26 @@ int32_t SequenceManager_App_Run(void)
   // 4) VALIDATE_LOT 상태에서는 Stub 결과를 1회만 평가해 다음 명령으로 변환
   (void)SequenceManager_RunLotValidation();
 
+  // 5) INCUBATION/MEASURING 상태는 일정 시간 경과 후 다음 단계로 자동 전이
+  if (s_state == SEQUENCEMANAGER_STATE_INCUBATION)
+  {
+    if ((HAL_GetTick() - s_state_enter_tick) >= SEQUENCEMANAGER_INCUBATION_DURATION_MS)
+    {
+      SequenceManager_SetState(SEQUENCEMANAGER_STATE_MEASURING);
+    }
+  }
+
+  if (s_state == SEQUENCEMANAGER_STATE_MEASURING)
+  {
+    if ((HAL_GetTick() - s_state_enter_tick) >= SEQUENCEMANAGER_MEASURING_DURATION_MS)
+    {
+      SequenceManager_SetState(SEQUENCEMANAGER_STATE_CALCULATING);
+    }
+  }
+
+  // 6) CALCULATING 상태에서는 AnalysisEngine을 1회만 실행해 결과를 저장
+  (void)SequenceManager_RunCalculation();
+
   return 0;
 }
 
@@ -326,6 +483,23 @@ int32_t SequenceManager_App_SubmitCommand(SequenceManager_Command_t cmd)
 SequenceManager_State_t SequenceManager_App_GetState(void)
 {
   return s_state;
+}
+
+/**
+ * @brief 마지막 계산 결과를 반환한다.
+ * @param out_result 결과 구조체의 const 포인터를 저장할 출력 포인터.
+ * @retval 0 성공.
+ * @retval -1 출력 포인터가 NULL.
+ */
+int32_t SequenceManager_App_GetLastResult(const AnalysisResult_t** out_result)
+{
+  if (out_result == (const AnalysisResult_t**)0)
+  {
+    return -1;
+  }
+
+  *out_result = &s_last_result;
+  return 0;
 }
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
