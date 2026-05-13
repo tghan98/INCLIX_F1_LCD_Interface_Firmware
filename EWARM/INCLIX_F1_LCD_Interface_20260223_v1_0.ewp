@@ -220,6 +220,7 @@
                     <name>CCDefines</name>
                     <state>USE_HAL_DRIVER</state>
                     <state>STM32G081xx</state>
+                    <state>USE_TEST_RAW_DATA</state>
                 </option>
                 <option>
                     <name>CCPreprocFile</name>
@@ -347,6 +348,7 @@
                     <state>$PROJ_DIR$/../Drivers/CMSIS/Include</state>
                     <state>$PROJ_DIR$/../USER</state>
                     <state>$PROJ_DIR$/../USER/App</state>
+                    <state>$PROJ_DIR$/../USER/App/AnalysisEngine_App</state>
                     <state>$PROJ_DIR$/../USER/App/BatteryDisplay_App</state>
                     <state>$PROJ_DIR$/../USER/App/BatteryMonitor_App</state>
                     <state>$PROJ_DIR$/../USER/App/Button_App</state>
@@ -1110,6 +1112,15 @@
             <group>
                 <name>App</name>
                 <group>
+                    <name>AnalysisEngine_App</name>
+                    <file>
+                        <name>$PROJ_DIR$\..\USER\App\AnalysisEngine_App\AnalysisEngine_App.c</name>
+                    </file>
+                    <file>
+                        <name>$PROJ_DIR$\..\USER\App\AnalysisEngine_App\AnalysisEngine_TestData.c</name>
+                    </file>
+                </group>
+                <group>
                     <name>BatteryDisplay_App</name>
                     <file>
                         <name>$PROJ_DIR$\..\USER\App\BatteryDisplay_App\BatteryDisplay_App.c</name>
@@ -1143,6 +1154,9 @@
                     </file>
                     <file>
                         <name>$PROJ_DIR$\..\USER\App\CodeChip_App\CodeChip_LotValidator.c</name>
+                    </file>
+                    <file>
+                        <name>$PROJ_DIR$\..\USER\App\CodeChip_App\CodeChip_TempLotData.c</name>
                     </file>
                 </group>
                 <group>

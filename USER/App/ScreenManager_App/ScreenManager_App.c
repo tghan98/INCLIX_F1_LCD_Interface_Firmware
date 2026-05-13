@@ -158,6 +158,7 @@ static uint8_t ScreenManager_IsDisplayScene(ScreenManager_State_t state)
     case SCREENMANAGER_STATE_VALIDATE_LOT:
     case SCREENMANAGER_STATE_WAIT_CASSETTE:
     case SCREENMANAGER_STATE_READY_TO_INCUBATE:
+    case SCREENMANAGER_STATE_INCUBATION:
     case SCREENMANAGER_STATE_ERROR:
     case SCREENMANAGER_STATE_MEASURING:
     case SCREENMANAGER_STATE_CALCULATING:
@@ -208,6 +209,9 @@ static ScreenManager_State_t ScreenManager_ResolveState(PowerManager_State_t pm_
 
     case SEQUENCEMANAGER_STATE_READY_TO_INCUBATE:
       return SCREENMANAGER_STATE_READY_TO_INCUBATE;
+
+    case SEQUENCEMANAGER_STATE_INCUBATION:
+      return SCREENMANAGER_STATE_INCUBATION;
 
     case SEQUENCEMANAGER_STATE_ERROR:
       return SCREENMANAGER_STATE_ERROR;
@@ -311,6 +315,10 @@ static void ScreenManager_RenderIfNeeded(void)
   {
     ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_TEXT_Y, "PRESS START", 1U);
   }
+  else if (s_state == SCREENMANAGER_STATE_INCUBATION)
+  {
+    ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_TEXT_Y, "INCUBATING...", 1U);
+  }
   else if (s_state == SCREENMANAGER_STATE_ERROR)
   {
     ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_TEXT_Y, "LOT ERROR", 1U);
@@ -325,7 +333,22 @@ static void ScreenManager_RenderIfNeeded(void)
   }
   else if (s_state == SCREENMANAGER_STATE_RESULT_DISPLAY)
   {
-    ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_TEXT_Y, "RESULT READY", 1U);
+    const AnalysisResult_t* last_result;
+    uint8_t i;
+
+    ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, SCREEN_TEXT_Y, "RESULT", 1U);
+
+    if (SequenceManager_Interface_GetLastResult(&last_result) == 0)
+    {
+      for (i = 0U; i < ANALYSIS_BAND_COUNT_MAX; i++)
+      {
+        if (last_result->result_text[i][0] != '\0')
+        {
+          uint16_t line_y = (uint16_t)(SCREEN_TEXT_Y + 10U + ((uint16_t)i * 10U));
+          ST7735S_Drv_DrawString3x5(SCREEN_TEXT_X, line_y, last_result->result_text[i], 1U);
+        }
+      }
+    }
   }
   else if (s_state == SCREENMANAGER_STATE_SLEEP)
   {

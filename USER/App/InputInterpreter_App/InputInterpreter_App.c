@@ -108,9 +108,12 @@ static int32_t InputInterpreter_DispatchToAnalysis(const InputInterpreter_Transl
     case INPUTINTERPRETER_CMD_ANALYSIS_START_REQUEST:
       if (seq_state == SEQUENCEMANAGER_STATE_READY_TO_INCUBATE)
       {
-        return 0;
+        sequence_cmd = SEQUENCEMANAGER_CMD_INCUBATION_START;
       }
-      sequence_cmd = SEQUENCEMANAGER_CMD_START_REQUEST;
+      else
+      {
+        sequence_cmd = SEQUENCEMANAGER_CMD_START_REQUEST;
+      }
       break;
 
     case INPUTINTERPRETER_CMD_CODECHIP_INSERTED:
@@ -195,7 +198,7 @@ static void InputInterpreter_TranslateButtonEvent(const ButtonAppEvent_t* event)
       cmd.cmd = INPUTINTERPRETER_CMD_CASSETTE_INSERTED;
       (void)InputInterpreter_Dispatch(&cmd);
     }
-    else if (seq_state != SEQUENCEMANAGER_STATE_READY_TO_INCUBATE)
+    else
     {
       cmd.target = INPUTINTERPRETER_TARGET_ANALYSIS;
       cmd.cmd = INPUTINTERPRETER_CMD_ANALYSIS_START_REQUEST;
